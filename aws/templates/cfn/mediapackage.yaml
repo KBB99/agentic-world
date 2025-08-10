@@ -1,0 +1,61 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Agentic Demo — AWS Elemental MediaPackage Channel + HLS OriginEndpoint (standard HLS)
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: agentic-demo
+    Description: Project name used as the MediaPackage Channel Id (safe characters only)
+  HlsManifestName:
+    Type: String
+    Default: index
+    Description: HLS manifest base filename (without extension), e.g. "index" - viewer expects /live/index.m3u8
+  SegmentDurationSeconds:
+    Type: Number
+    Default: 2
+    MinValue: 1
+    MaxValue: 10
+    Description: HLS segment duration in seconds (2-6 typical for standard HLS)
+  PlaylistWindowSeconds:
+    Type: Number
+    Default: 6
+    MinValue: 2
+    MaxValue: 120
+    Description: Approximate total duration of media that the playlist includes
+
+Resources:
+  MpChannel:
+    Type: AWS::MediaPackage::Channel
+    Properties:
+      Id: !Ref ProjectName
+      Description: !Sub '${ProjectName} MediaPackage channel for live HLS'
+
+  MpEndpointHls:
+    Type: AWS::MediaPackage::OriginEndpoint
+    Properties:
+      ChannelId: !Ref MpChannel
+      Id: !Sub '${ProjectName}-hls'
+      Description: !Sub '${ProjectName} HLS origin endpoint'
+      ManifestName: !Ref HlsManifestName
+      HlsPackage:
+        SegmentDurationSeconds: !Ref SegmentDurationSeconds
+        PlaylistWindowSeconds: !Ref PlaylistWindowSeconds
+        UseAudioRenditionGroup: false
+        IncludeIframeOnlyStream: false
+
+Outputs:
+  MediaPackageChannelId:
+    Description: MediaPackage Channel Id (used by MediaLive destination settings)
+    Value: !Ref MpChannel
+  MediaPackageChannelArn:
+    Description: MediaPackage Channel ARN
+    Value: !GetAtt MpChannel.Arn
+  HlsEndpointId:
+    Description: MediaPackage HLS OriginEndpoint Id
+    Value: !Ref MpEndpointHls
+  HlsEndpointUrl:
+    Description: Fully-qualified HLS URL (ends with /{ManifestName}.m3u8)
+    Value: !GetAtt MpEndpointHls.Url
+  HlsManifestName:
+    Description: HLS manifest base filename
+    Value: !Ref HlsManifestName

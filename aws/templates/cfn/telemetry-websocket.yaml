@@ -1,0 +1,315 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Agentic Demo — Telemetry via API Gateway WebSocket + Lambda + DynamoDB (broadcast to all connections)
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: agentic-demo
+    Description: Project prefix for resource names
+  StageName:
+    Type: String
+    Default: prod
+    AllowedPattern: '^[a-z0-9\-]+$'
+    Description: API stage name for the WebSocket API
+  TableName:
+    Type: String
+    Default: agentic-demo-telemetry-connections
+    Description: DynamoDB table to store active WebSocket connectionIds
+
+Resources:
+  ConnTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: connectionId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: connectionId
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+
+  TelemetryRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-telemetry-role-${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: telemetry-basic
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Scan
+                Resource: !GetAtt ConnTable.Arn
+              - Effect: Allow
+                Action:
+                  - execute-api:ManageConnections
+                Resource:
+                  # Allow posting to any stage of this API's @connections endpoint
+                  - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/@connections/*'
+                  - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/*/@connections/*'
+
+  TelemetryConnectFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-telemetry-connect'
+      Description: Store connectionId in DynamoDB on $connect
+      Runtime: nodejs16.x
+      Handler: index.handler
+      Role: !GetAtt TelemetryRole.Arn
+      Timeout: 6
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ConnTable
+      Code:
+        ZipFile: |
+          'use strict';
+          const AWS = require('aws-sdk');
+          const ddb = new AWS.DynamoDB.DocumentClient();
+          exports.handler = async (event) => {
+            const connectionId = event.requestContext && event.requestContext.connectionId;
+            if (!connectionId) return { statusCode: 400, body: 'Missing connectionId' };
+            try {
+              await ddb.put({
+                TableName: process.env.TABLE_NAME,
+                Item: { connectionId, ts: Date.now() }
+              }).promise();
+              return { statusCode: 200, body: 'Connected' };
+            } catch (err) {
+              console.error('Connect error', err);
+              return { statusCode: 500, body: 'Failed to connect.' };
+            }
+          };
+
+  TelemetryDisconnectFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-telemetry-disconnect'
+      Description: Remove connectionId from DynamoDB on $disconnect
+      Runtime: nodejs16.x
+      Handler: index.handler
+      Role: !GetAtt TelemetryRole.Arn
+      Timeout: 6
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ConnTable
+      Code:
+        ZipFile: |
+          'use strict';
+          const AWS = require('aws-sdk');
+          const ddb = new AWS.DynamoDB.DocumentClient();
+          exports.handler = async (event) => {
+            const connectionId = event.requestContext && event.requestContext.connectionId;
+            if (!connectionId) return { statusCode: 400, body: 'Missing connectionId' };
+            try {
+              await ddb.delete({
+                TableName: process.env.TABLE_NAME,
+                Key: { connectionId }
+              }).promise();
+              return { statusCode: 200, body: 'Disconnected' };
+            } catch (err) {
+              console.error('Disconnect error', err);
+              return { statusCode: 500, body: 'Failed to disconnect.' };
+            }
+          };
+
+  TelemetryMessageFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-telemetry-message'
+      Description: Broadcast incoming telemetry messages to all active connections
+      Runtime: nodejs16.x
+      Handler: index.handler
+      Role: !GetAtt TelemetryRole.Arn
+      Timeout: 15
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ConnTable
+      Code:
+        ZipFile: |
+          'use strict';
+          const AWS = require('aws-sdk');
+          const ddb = new AWS.DynamoDB.DocumentClient();
+          // Build ApiGatewayManagementApi client for this connection's domain/stage
+          const mgmt = (event) => {
+            const { domainName, stage } = event.requestContext || {};
+            const endpoint = `${domainName}/${stage}`;
+            return new AWS.ApiGatewayManagementApi({ apiVersion: '2018-11-29', endpoint });
+          };
+          exports.handler = async (event) => {
+            let payload;
+            try {
+              const body = JSON.parse(event.body || '{}');
+              // Accept either envelope or flat:
+              // 1) { action: "telemetry", data: { goal, action, rationale, result, actionText, act } }
+              // 2) { action: "telemetry", goal, action, rationale, result } (legacy)
+              const data = (body && typeof body.data === 'object' && body.data !== null) ? body.data : body;
+              payload = {
+                goal: data.goal,
+                action: (data.actionText ?? data.act ?? data.action),
+                rationale: data.rationale,
+                result: data.result
+              };
+            } catch (e) {
+              payload = { error: 'invalid_json' };
+            }
+            const message = JSON.stringify(payload);
+            const client = mgmt(event);
+
+            // Scan connections (demo scale). For large fanout, migrate to DDB Streams + SNS.
+            let lastKey = undefined;
+            let stale = [];
+            let sent = 0;
+            do {
+              const resp = await ddb.scan({
+                TableName: process.env.TABLE_NAME,
+                ProjectionExpression: 'connectionId',
+                ExclusiveStartKey: lastKey
+              }).promise();
+              for (const item of (resp.Items || [])) {
+                const connectionId = item.connectionId;
+                try {
+                  await client.postToConnection({ ConnectionId: connectionId, Data: message }).promise();
+                  sent++;
+                } catch (err) {
+                  if (err.statusCode === 410) {
+                    stale.push(connectionId);
+                  } else {
+                    console.error('postToConnection error', connectionId, err);
+                  }
+                }
+              }
+              lastKey = resp.LastEvaluatedKey;
+            } while (lastKey);
+
+            // Cleanup stale connections
+            for (const connectionId of stale) {
+              try {
+                await ddb.delete({ TableName: process.env.TABLE_NAME, Key: { connectionId } }).promise();
+              } catch (_) {}
+            }
+            return { statusCode: 200, body: JSON.stringify({ sent, cleaned: stale.length }) };
+          };
+
+  WebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${ProjectName}-telemetry-ws'
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: '$request.body.action'
+
+  ConnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TelemetryConnectFunction.Arn}/invocations'
+
+  DisconnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TelemetryDisconnectFunction.Arn}/invocations'
+
+  MessageIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TelemetryMessageFunction.Arn}/invocations'
+
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $connect
+      AuthorizationType: NONE
+      Target: !Join ['',[ 'integrations/', !Ref ConnectIntegration ]]
+
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $disconnect
+      AuthorizationType: NONE
+      Target: !Join ['',[ 'integrations/', !Ref DisconnectIntegration ]]
+
+  TelemetryRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: telemetry
+      AuthorizationType: NONE
+      Target: !Join ['',[ 'integrations/', !Ref MessageIntegration ]]
+
+  Deployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    Properties:
+      ApiId: !Ref WebSocketApi
+      Description: Initial deployment
+    DependsOn:
+      - ConnectRoute
+      - DisconnectRoute
+      - TelemetryRoute
+
+  Stage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref WebSocketApi
+      StageName: !Ref StageName
+      DeploymentId: !Ref Deployment
+      AutoDeploy: false
+
+  PermConnect:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt TelemetryConnectFunction.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*'
+
+  PermDisconnect:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt TelemetryDisconnectFunction.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*'
+
+  PermMessage:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt TelemetryMessageFunction.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*'
+
+Outputs:
+  WebSocketApiId:
+    Description: API Gateway WebSocket API Id
+    Value: !Ref WebSocketApi
+  WebSocketWssUrl:
+    Description: WebSocket WSS URL for clients
+    Value: !Sub 'wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}'
+  ConnectionTableName:
+    Description: DynamoDB table name for active connections
+    Value: !Ref ConnTable

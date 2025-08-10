@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Agentic Demo Viewer</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.14/dist/hls.min.js"></script>
+  <style>
+    :root { --panel-bg: rgba(10,10,10,0.7); --accent: #36d38c; --text: #e9eef3; }
+    html,body { height: 100%; margin: 0; background: #000; color: var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;}
+    #container { position: relative; width: 100%; height: 100%; display: grid; place-items: center; }
+    video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+    .overlay { position: absolute; top: 16px; right: 16px; background: var(--panel-bg); border: 1px solid rgba(255,255,255,0.08); padding: 12px 14px; border-radius: 8px; max-width: 28rem; }
+    .overlay h2 { margin: 0 0 8px 0; font-size: 14px; font-weight: 600; letter-spacing: 0.3px; color: #b7c5d3; }
+    .row { display: flex; gap: 8px; margin: 6px 0; }
+    .k { width: 92px; color: #9fb0c0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .v { flex: 1; font-size: 14px; color: var(--text); }
+    .status { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; font-size: 12px; background: rgba(54,211,140,0.15); color: var(--accent); border: 1px solid rgba(54,211,140,0.35); }
+    .status.off { background: rgba(229,77,66,0.15); color: #ff7a70; border-color: rgba(229,77,66,0.35); }
+    #toast { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--panel-bg); color: var(--text); padding: 10px 14px; border-radius: 8px; font-size: 13px; border: 1px solid rgba(255,255,255,0.08); opacity: 0; transition: opacity 200ms ease-in-out; }
+    #toast.show { opacity: 1; }
+    .play-overlay { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+    .play-overlay button { pointer-events: all; background: var(--accent); color: #0b1b26; border: none; border-radius: 999px; padding: 10px 18px; font-weight: 600; letter-spacing: 0.3px; cursor: pointer; box-shadow: 0 6px 18px rgba(54,211,140,0.35); }
+
+    /* Animated agent overlay */
+    .agent {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      width: 180px;
+      height: 180px;
+      pointer-events: none;
+      opacity: 0.95;
+    }
+    #agentBox svg { width: 100%; height: 100%; }
+    /* Blink animation on the eyes */
+    #agentBox .eye { animation: blink 6s infinite; transform-origin: center; }
+    @keyframes blink {
+      0%, 8%, 100% { transform: scaleY(1); }
+      9% { transform: scaleY(0.1); }
+    }
+    /* Talk animation toggled by adding .talk to #agentBox */
+    #agentBox.talk #mouth {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: talk 0.35s ease-in-out infinite;
+    }
+    @keyframes talk {
+      0%, 100% { transform: scaleY(0.8); }
+      50% { transform: scaleY(1.3); }
+    }
+  </style>
+</head>
+<body>
+ <div id="container">
+   <video id="player" controls playsinline></video>
+   <div class="play-overlay" id="playOverlay"><button id="playBtn">Play</button></div>
+   <div class="overlay" id="overlay">
+     <h2>Agent Telemetry</h2>
+     <div class="row"><div class="k">Status</div><div class="v"><span id="status" class="status off">Disconnected</span></div></div>
+     <div class="row"><div class="k">Goal</div><div class="v" id="goal">—</div></div>
+     <div class="row"><div class="k">Action</div><div class="v" id="action">—</div></div>
+     <div class="row"><div class="k">Rationale</div><div class="v" id="rationale">—</div></div>
+     <div class="row"><div class="k">Result</div><div class="v" id="result">—</div></div>
+   </div>
+
+   <!-- Animated agent (SVG-based avatar rendered over video) -->
+   <div id="agentBox" class="agent" aria-label="Agent avatar">
+     <svg viewBox="0 0 200 200" role="img" aria-label="Animated agent">
+       <!-- Head -->
+       <circle cx="100" cy="100" r="80" fill="#10222b" stroke="#2f4c5a" stroke-width="4"/>
+       <!-- Face plate -->
+       <circle cx="100" cy="100" r="64" fill="#163242"/>
+       <!-- Eyes -->
+       <g class="eye" transform="translate(68,85)">
+         <circle cx="0" cy="0" r="8" fill="#e9eef3"/>
+       </g>
+       <g class="eye" transform="translate(132,85)">
+         <circle cx="0" cy="0" r="8" fill="#e9eef3"/>
+       </g>
+       <!-- Mouth (animated on talk) -->
+       <rect id="mouth" x="70" y="125" width="60" height="12" rx="6" fill="#e06d6d"/>
+       <!-- Accent ring -->
+       <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(54,211,140,0.25)" stroke-width="2"/>
+     </svg>
+   </div>
+
+   <div id="toast"></div>
+ </div>
+ <script>
+ (function() {
+   const video = document.getElementById('player');
+   const playBtn = document.getElementById('playBtn');
+   const playOverlay = document.getElementById('playOverlay');
+   const toast = document.getElementById('toast');
+   function showToast(msg) { toast.textContent = msg; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2500); }
+   const urlParams = new URLSearchParams(window.location.search);
+   const srcParam = urlParams.get('src');
+   const defaultLive = window.location.origin + '/live/index.m3u8';
+   const fallbackVod = window.location.origin + '/assets/sample.mp4';
+   const sources = srcParam ? [srcParam] : [defaultLive, fallbackVod];
+   let current = 0;
+   function isHls(u) { return /\.m3u8(\?.*)?$/i.test(u); }
+   function tryNext() {
+     if (current >= sources.length) { showToast('No playable source found'); return; }
+     const src = sources[current++];
+     if (isHls(src)) {
+       if (window.Hls && window.Hls.isSupported()) {
+         const hls = new Hls({ lowLatencyMode: false, enableWorker: true });
+         hls.on(Hls.Events.ERROR, (e, data) => {
+           if (data.fatal) { hls.destroy(); showToast('HLS error, falling back'); tryNext(); }
+         });
+         hls.loadSource(src);
+         hls.attachMedia(video);
+       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+         video.src = src;
+       } else {
+         showToast('HLS not supported, falling back'); tryNext(); return;
+       }
+     } else {
+       video.src = src; // e.g., MP4 fallback
+     }
+   }
+   video.addEventListener('error', () => { showToast('Playback error, trying next source'); tryNext(); });
+   playBtn.addEventListener('click', async () => {
+     playOverlay.style.display = 'none';
+     tryNext();
+     try { await video.play(); } catch (e) { /* user gesture needed */ }
+   });
+
+   // Telemetry via SSE (proxied by CloudFront at /telemetry/stream)
+   const st = document.getElementById('status');
+   const goal = document.getElementById('goal');
+   const action = document.getElementById('action');
+   const rationale = document.getElementById('rationale');
+   const result = document.getElementById('result');
+   function setStatus(on) { st.classList.toggle('off', !on); st.textContent = on ? 'Agent Running' : 'Disconnected'; }
+   setStatus(false);
+
+   // Animated agent behavior (simple SVG avatar with blink + talk)
+   const agent = document.getElementById('agentBox');
+   let talkTimer = null;
+   function agentTalk(durationMs = 1800) {
+     // Reset any previous timer and (re)apply talk animation briefly
+     if (talkTimer) clearTimeout(talkTimer);
+     agent.classList.add('talk');
+     talkTimer = setTimeout(() => {
+       agent.classList.remove('talk');
+       talkTimer = null;
+     }, durationMs);
+   }
+
+   // Telemetry: prefer WebSocket if provided (?ws=wss://...), else fall back to SSE (/telemetry/stream)
+   function handleTelemetry(d) {
+     try {
+       const data = (typeof d === 'string') ? JSON.parse(d) : (d || {});
+       let talked = false;
+       if (typeof data.goal === 'string') { goal.textContent = data.goal; talked = true; }
+       if (typeof data.action === 'string') { action.textContent = data.action; talked = true; }
+       if (typeof data.rationale === 'string') { rationale.textContent = data.rationale; talked = true; }
+       if (typeof data.result === 'string') { result.textContent = data.result; }
+       if (talked) agentTalk(); // brief talk animation on update
+     } catch (_) {
+       // ignore parse errors
+     }
+   }
+
+   const wsParam = urlParams.get('ws') || urlParams.get('telemetry');
+   if (wsParam && typeof WebSocket !== 'undefined') {
+     try {
+       const ws = new WebSocket(wsParam);
+       ws.onopen = () => setStatus(true);
+       ws.onmessage = (ev) => handleTelemetry(ev.data);
+       ws.onerror = () => setStatus(false);
+       ws.onclose = () => setStatus(false);
+     } catch (e) {
+       // If WS connect fails, try SSE fallback
+       try {
+         if (typeof EventSource !== 'undefined') {
+           const es = new EventSource('/telemetry/stream');
+           es.onopen = () => setStatus(true);
+           es.addEventListener('telemetry', (ev) => handleTelemetry(ev.data));
+           es.onerror = () => setStatus(false);
+         }
+       } catch (_) {}
+     }
+   } else if (typeof EventSource !== 'undefined') {
+     try {
+       const es = new EventSource('/telemetry/stream');
+       es.onopen = () => setStatus(true);
+       es.addEventListener('telemetry', (ev) => handleTelemetry(ev.data));
+       es.onerror = () => setStatus(false);
+     } catch (e) {
+       // SSE unsupported or blocked
+     }
+   }
+ })();
+ </script>
+</body>
+</html>

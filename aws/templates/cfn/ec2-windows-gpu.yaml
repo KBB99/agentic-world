@@ -1,0 +1,141 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Agentic Demo — Windows GPU EC2 instance for Unreal/OBS (g5.xlarge default), SSM-enabled, RDP restricted
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: agentic-demo
+    Description: Project name prefix for tagging and naming
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 KeyPair to enable RDP password decryption
+  InstanceType:
+    Type: String
+    Default: g5.xlarge
+    AllowedValues:
+      - g5.xlarge
+      - g5.2xlarge
+      - g4dn.xlarge
+      - g4dn.2xlarge
+    Description: GPU instance size
+  RdpCidr:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: CIDR allowed for RDP (3389). Use your_ip/32 for security.
+  VolumeSize:
+    Type: Number
+    Default: 200
+    MinValue: 64
+    MaxValue: 4096
+    Description: Size of the root EBS volume (GiB)
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC where the instance will be launched
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subnet (in the specified VPC) where the instance will be launched
+  AmiIdParam:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: /aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base
+    Description: SSM Parameter for the latest Windows Server 2022 AMI
+
+Resources:
+  Ec2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-ec2-ssm-${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  Ec2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [ !Ref Ec2Role ]
+
+  Ec2Sg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: RDP access for Windows GPU EC2 instance
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3389
+          ToPort: 3389
+          CidrIp: !Ref RdpCidr
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-gpu-sg'
+
+  GpuInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmiIdParam
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      IamInstanceProfile: !Ref Ec2InstanceProfile
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds:
+        - !Ref Ec2Sg
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: !Ref VolumeSize
+            VolumeType: gp3
+            DeleteOnTermination: true
+            Encrypted: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-gpu'
+        - Key: Project
+          Value: !Ref ProjectName
+      UserData:
+        Fn::Base64: !Sub |
+          <powershell>
+          # Allow PowerShell scripts
+          Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope LocalMachine -Force
+
+          # Ensure TLS 1.2 for downloads
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+          # Install Chocolatey (package manager)
+          Set-ExecutionPolicy Bypass -Scope Process -Force
+          iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+
+          # Install OBS Studio (silent)
+          choco install obs-studio -y --no-progress
+
+          # Optional: DirectX runtime (helps with some pipelines)
+          choco install directx -y --no-progress
+
+          # Log a marker so we know user data completed
+          New-Item -Path "C:\agentic\setup" -ItemType Directory -Force | Out-Null
+          Set-Content -Path "C:\agentic\setup\user-data.log" -Value "OBS installed via Chocolatey. GPU drivers must be installed manually (see runbook)."
+
+          # Reboot is not strictly required; omit for now
+          # Restart-Computer -Force
+          </powershell>
+
+Outputs:
+  InstanceId:
+    Description: EC2 Instance Id
+    Value: !Ref GpuInstance
+  PublicIp:
+    Description: Public IPv4 address
+    Value: !GetAtt GpuInstance.PublicIp
+  PublicDnsName:
+    Description: Public DNS name
+    Value: !GetAtt GpuInstance.PublicDnsName
+  SecurityGroupId:
+    Description: Security Group Id with RDP rule
+    Value: !Ref Ec2Sg

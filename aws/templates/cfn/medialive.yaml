@@ -1,0 +1,173 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Agentic Demo — AWS Elemental MediaLive RTMP input + single-pipeline channel to MediaPackage
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: agentic-demo
+    Description: Project name used as a base for input/channel names
+  MediaPackageChannelId:
+    Type: String
+    Description: Existing MediaPackage Channel Id (from the MediaPackage stack)
+  InputCidr:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: CIDR allowed to push RTMP (restrict in production)
+  ChannelClass:
+    Type: String
+    Default: SINGLE_PIPELINE
+    AllowedValues:
+    - SINGLE_PIPELINE
+    - STANDARD
+    Description: SINGLE_PIPELINE is cheaper; STANDARD is redundant (2 pipelines)
+  VideoBitrate:
+    Type: Number
+    Default: 4500000
+    Description: Video bitrate in bps
+  FramerateNumerator:
+    Type: Number
+    Default: 30
+  FramerateDenominator:
+    Type: Number
+    Default: 1
+  Width:
+    Type: Number
+    Default: 1920
+  Height:
+    Type: Number
+    Default: 1080
+  AudioBitrate:
+    Type: Number
+    Default: 128000
+
+Resources:
+  MlRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - medialive.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: medialive-basic
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: "*"
+          - Effect: Allow
+            Action:
+            - mediapackage:DescribeChannel
+            Resource: "*"
+
+  MlInputSg:
+    Type: AWS::MediaLive::InputSecurityGroup
+    Properties:
+      WhitelistRules:
+      - Cidr: !Ref InputCidr
+
+  MlInput:
+    Type: AWS::MediaLive::Input
+    Properties:
+      Name: !Sub '${ProjectName}-rtmp-input'
+      Type: RTMP_PUSH
+      InputSecurityGroups:
+      - !Ref MlInputSg
+      Destinations:
+      - StreamName: !Sub '${ProjectName}/primary'
+      - StreamName: !Sub '${ProjectName}/backup'
+
+  MlChannel:
+    Type: AWS::MediaLive::Channel
+    Properties:
+      Name: !Sub '${ProjectName}-channel'
+      RoleArn: !GetAtt MlRole.Arn
+      ChannelClass: !Ref ChannelClass
+      InputAttachments:
+      - InputId: !Ref MlInput
+        InputAttachmentName: !Sub '${ProjectName}-att'
+      Destinations:
+      - Id: mp-dest-1
+        MediaPackageSettings:
+        - ChannelId: !Ref MediaPackageChannelId
+      EncoderSettings:
+        TimecodeConfig:
+          Source: SYSTEMCLOCK
+        OutputGroups:
+        - Name: to_mediapackage
+          OutputGroupSettings:
+            MediaPackageGroupSettings:
+              Destination:
+                DestinationRefId: mp-dest-1
+          Outputs:
+          - OutputName: mp_hls_1
+            OutputSettings:
+              MediaPackageOutputSettings: {}
+            AudioDescriptionNames:
+            - audio_stereo
+            VideoDescriptionName: video_1080p
+        AudioDescriptions:
+        - Name: audio_stereo
+          CodecSettings:
+            AacSettings:
+              Bitrate: !Ref AudioBitrate
+              CodingMode: CODING_MODE_2_0
+              InputType: NORMAL
+              Profile: LC
+              RateControlMode: CBR
+              RawFormat: NONE
+              SampleRate: 48000
+              Spec: MPEG4
+        VideoDescriptions:
+        - Name: video_1080p
+          Width: !Ref Width
+          Height: !Ref Height
+          RespondToAfd: NONE
+          Sharpness: 50
+          ScalingBehavior: DEFAULT
+          CodecSettings:
+            H264Settings:
+              AfdSignaling: NONE
+              Bitrate: !Ref VideoBitrate
+              FramerateControl: SPECIFIED
+              FramerateNumerator: !Ref FramerateNumerator
+              FramerateDenominator: !Ref FramerateDenominator
+              GopBReference: DISABLED
+              GopClosedCadence: 1
+              GopNumBFrames: 3
+              GopSize: 2
+              GopSizeUnits: SECONDS
+              Level: H264_LEVEL_AUTO
+              LookAheadRateControl: MEDIUM
+              NumRefFrames: 3
+              ParControl: SPECIFIED
+              ParNumerator: 1
+              ParDenominator: 1
+              Profile: HIGH
+              RateControlMode: CBR
+              ScanType: PROGRESSIVE
+              SceneChangeDetect: ENABLED
+              Slices: 1
+              SpatialAq: ENABLED
+              Syntax: DEFAULT
+              TemporalAq: ENABLED
+              TimecodeInsertion: DISABLED
+
+Outputs:
+  MediaLiveInputId:
+    Description: MediaLive Input Id (use to retrieve RTMP ingest endpoints via CLI)
+    Value: !Ref MlInput
+  MediaLiveChannelId:
+    Description: MediaLive Channel Id
+    Value: !Ref MlChannel
+  MediaLiveChannelArn:
+    Description: MediaLive Channel ARN
+    Value: !GetAtt MlChannel.Arn

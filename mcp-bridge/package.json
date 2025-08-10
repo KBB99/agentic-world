@@ -1,0 +1,17 @@
+{
+  "name": "mcp-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Unreal MCP (TCP JSON-RPC) to Agentic Demo Telemetry (API Gateway WebSocket) bridge",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}

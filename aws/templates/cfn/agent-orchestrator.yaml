@@ -1,0 +1,333 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AI Agent Orchestrator for Unreal Engine character control via Claude/Bedrock'
+
+Parameters:
+  Project:
+    Type: String
+    Default: agentic-demo
+    Description: Project name for resource naming
+  
+  BedrockModel:
+    Type: String
+    Default: anthropic.claude-3-sonnet-20240229-v1:0
+    Description: Bedrock model ID for Claude
+  
+  WebSocketApiId:
+    Type: String
+    Description: API Gateway WebSocket API ID from telemetry stack
+
+Resources:
+  # DynamoDB table for agent state and memory
+  AgentStateTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Project}-agent-state'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: agentId
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: N
+      KeySchema:
+        - AttributeName: agentId
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # Agent context/memory table
+  AgentContextTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Project}-agent-context'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: agentId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: agentId
+          KeyType: HASH
+
+  # Lambda execution role with Bedrock permissions
+  AgentOrchestratorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: BedrockAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}'
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !GetAtt AgentStateTable.Arn
+                  - !GetAtt AgentContextTable.Arn
+                  - !Sub '${AgentStateTable.Arn}/index/*'
+        - PolicyName: WebSocketAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - execute-api:ManageConnections
+                Resource: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApiId}/*'
+
+  # Agent orchestrator Lambda function
+  AgentOrchestratorFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${Project}-agent-orchestrator'
+      Runtime: nodejs18.x
+      Handler: index.handler
+      Timeout: 30
+      MemorySize: 512
+      Role: !GetAtt AgentOrchestratorRole.Arn
+      Environment:
+        Variables:
+          BEDROCK_MODEL: !Ref BedrockModel
+          AGENT_STATE_TABLE: !Ref AgentStateTable
+          AGENT_CONTEXT_TABLE: !Ref AgentContextTable
+          WS_API_ENDPOINT: !Sub 'https://${WebSocketApiId}.execute-api.${AWS::Region}.amazonaws.com/prod'
+      Code:
+        ZipFile: |
+          const { BedrockRuntimeClient, InvokeModelCommand } = require("@aws-sdk/client-bedrock-runtime");
+          const { DynamoDBClient, GetItemCommand, PutItemCommand, QueryCommand } = require("@aws-sdk/client-dynamodb");
+          const { ApiGatewayManagementApiClient, PostToConnectionCommand } = require("@aws-sdk/client-apigatewaymanagementapi");
+          
+          const bedrock = new BedrockRuntimeClient({ region: process.env.AWS_REGION });
+          const dynamodb = new DynamoDBClient({ region: process.env.AWS_REGION });
+          const apiGw = new ApiGatewayManagementApiClient({ 
+            endpoint: process.env.WS_API_ENDPOINT 
+          });
+          
+          exports.handler = async (event) => {
+            console.log('Event:', JSON.stringify(event));
+            
+            try {
+              const { connectionId, requestContext } = event;
+              const body = JSON.parse(event.body || '{}');
+              
+              if (body.action === 'agent_request') {
+                const result = await processAgentRequest(connectionId, body.data);
+                return { statusCode: 200, body: JSON.stringify(result) };
+              }
+              
+              return { statusCode: 200, body: 'OK' };
+            } catch (error) {
+              console.error('Error:', error);
+              return { statusCode: 500, body: error.message };
+            }
+          };
+          
+          async function processAgentRequest(connectionId, data) {
+            const { agentId, gameState, characterState, requestType } = data;
+            
+            // Get agent context and history
+            const context = await getAgentContext(agentId);
+            const history = await getRecentHistory(agentId, 5);
+            
+            // Build prompt for Claude
+            const prompt = buildAgentPrompt(context, gameState, characterState, history, requestType);
+            
+            // Invoke Claude via Bedrock
+            const decision = await invokeClaudeForDecision(prompt);
+            
+            // Store decision in history
+            await storeAgentDecision(agentId, decision, gameState);
+            
+            // Send command back through WebSocket
+            await sendCommandToUnreal(connectionId, decision);
+            
+            return decision;
+          }
+          
+          async function getAgentContext(agentId) {
+            const result = await dynamodb.send(new GetItemCommand({
+              TableName: process.env.AGENT_CONTEXT_TABLE,
+              Key: { agentId: { S: agentId } }
+            }));
+            
+            return result.Item ? JSON.parse(result.Item.context.S) : {
+              personality: "helpful and curious",
+              goals: [],
+              knowledge: {}
+            };
+          }
+          
+          async function getRecentHistory(agentId, limit) {
+            const result = await dynamodb.send(new QueryCommand({
+              TableName: process.env.AGENT_STATE_TABLE,
+              KeyConditionExpression: 'agentId = :aid',
+              ExpressionAttributeValues: {
+                ':aid': { S: agentId }
+              },
+              Limit: limit,
+              ScanIndexForward: false
+            }));
+            
+            return result.Items.map(item => JSON.parse(item.data.S));
+          }
+          
+          function buildAgentPrompt(context, gameState, characterState, history, requestType) {
+            const systemPrompt = `You are controlling a character in Unreal Engine.
+          
+          Character personality: ${context.personality}
+          Current goals: ${JSON.stringify(context.goals)}
+          
+          Available commands:
+          - MoveTo(location): Navigate to coordinates or named location
+          - Interact(object): Interact with an object
+          - Speak(text): Make the character speak
+          - PlayAnimation(name): Play animation (idle, wave, point, sit, etc)
+          - LookAt(target): Orient toward target
+          - Wait(seconds): Pause before next action
+          - PickUp(item): Pick up an item
+          - Drop(item): Drop held item
+          
+          Current game state: ${JSON.stringify(gameState)}
+          Character state: ${JSON.stringify(characterState)}
+          Recent actions: ${JSON.stringify(history)}
+          Request type: ${requestType || 'decide_action'}
+          
+          Respond with a JSON object containing:
+          {
+            "goal": "current high-level objective",
+            "action": "command name",
+            "parameters": { /* command parameters */ },
+            "rationale": "reasoning for this action",
+            "dialogue": "optional character speech",
+            "animation": "optional animation name"
+          }`;
+            
+            return systemPrompt;
+          }
+          
+          async function invokeClaudeForDecision(prompt) {
+            const command = new InvokeModelCommand({
+              modelId: process.env.BEDROCK_MODEL,
+              contentType: 'application/json',
+              accept: 'application/json',
+              body: JSON.stringify({
+                anthropic_version: "bedrock-2023-05-31",
+                max_tokens: 500,
+                temperature: 0.7,
+                messages: [{
+                  role: "user",
+                  content: prompt
+                }]
+              })
+            });
+            
+            const response = await bedrock.send(command);
+            const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+            
+            try {
+              // Extract JSON from Claude's response
+              const content = responseBody.content[0].text;
+              const jsonMatch = content.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
+                return JSON.parse(jsonMatch[0]);
+              }
+            } catch (e) {
+              console.error('Failed to parse Claude response:', e);
+            }
+            
+            // Fallback decision
+            return {
+              goal: "Explore environment",
+              action: "Wait",
+              parameters: { seconds: 1 },
+              rationale: "Processing situation",
+              dialogue: null
+            };
+          }
+          
+          async function storeAgentDecision(agentId, decision, gameState) {
+            const timestamp = Date.now();
+            const ttl = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // 7 days
+            
+            await dynamodb.send(new PutItemCommand({
+              TableName: process.env.AGENT_STATE_TABLE,
+              Item: {
+                agentId: { S: agentId },
+                timestamp: { N: timestamp.toString() },
+                ttl: { N: ttl.toString() },
+                data: { S: JSON.stringify({
+                  decision,
+                  gameState,
+                  timestamp: new Date(timestamp).toISOString()
+                })}
+              }
+            }));
+          }
+          
+          async function sendCommandToUnreal(connectionId, decision) {
+            const message = {
+              action: 'agent_command',
+              data: decision
+            };
+            
+            try {
+              await apiGw.send(new PostToConnectionCommand({
+                ConnectionId: connectionId,
+                Data: JSON.stringify(message)
+              }));
+            } catch (error) {
+              console.error('Failed to send command to connection:', error);
+            }
+          }
+
+  # Lambda permission for WebSocket invocation
+  AgentOrchestratorPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AgentOrchestratorFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApiId}/*'
+
+Outputs:
+  AgentOrchestratorFunctionArn:
+    Description: ARN of the agent orchestrator Lambda function
+    Value: !GetAtt AgentOrchestratorFunction.Arn
+    Export:
+      Name: !Sub '${Project}-agent-orchestrator-arn'
+  
+  AgentStateTableName:
+    Description: Name of the agent state DynamoDB table
+    Value: !Ref AgentStateTable
+    Export:
+      Name: !Sub '${Project}-agent-state-table'
+  
+  AgentContextTableName:
+    Description: Name of the agent context DynamoDB table
+    Value: !Ref AgentContextTable
+    Export:
+      Name: !Sub '${Project}-agent-context-table'
