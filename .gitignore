@@ -1,0 +1,98 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.npm
+*.tgz
+package-lock.json
+yarn.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# AWS
+aws/out/
+*.outputs.json
+stack-outputs.json
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# API Keys and Secrets
+*_KEY
+*_SECRET
+*.key
+*.pem
+credentials.json
+secrets.json
+
+# Cost tracking
+costs.json
+.paused
+
+# Character work files (keep structure but not content)
+character_files/*/*
+!character_files/*/.gitkeep
+
+# Temporary files
+*.log
+*.tmp
+/tmp/
+temp/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+*.code-workspace
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# Documentation builds
+docs/_build/
+docs/.doctrees/
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+*.cover
+
+# MCP specific
+mcp_action.js
+test-mcp.js
+
+# Keep important structure
+!character_files/
+!character_files/alex_chen/
+!character_files/ashley_kim/
+!character_files/tyler_chen/
+!character_files/jamie_rodriguez/
+!character_files/maria_gonzalez/
+!character_files/brittany_torres/
+!character_files/dorothy_jackson/
