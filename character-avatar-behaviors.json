@@ -1,0 +1,245 @@
+{
+  "alex_chen": {
+    "character_id": "alex_chen",
+    "display_name": "Alex Chen",
+    "avatar_mesh": "SK_Mannequin_Exhausted",
+    "economic_tier": "poor",
+    "default_location": "public_library",
+    "clothing": {
+      "top": "worn_hoodie",
+      "bottom": "old_jeans", 
+      "shoes": "broken_sneakers",
+      "accessories": ["cracked_glasses", "old_backpack"]
+    },
+    "animations": {
+      "idle": "Idle_Exhausted_Loop",
+      "walk": "Walk_Tired",
+      "run": "Run_Desperate",
+      "sit": "Sit_Floor_Defeated",
+      "work": "Type_Frantically",
+      "stress": "Head_In_Hands",
+      "sleep": "Sleep_Rough"
+    },
+    "behavioral_patterns": [
+      {
+        "trigger": "hunger > 80",
+        "actions": [
+          "walk_to(food_bank)",
+          "play_animation(stomach_clutch)"
+        ]
+      },
+      {
+        "trigger": "time == library_closing",
+        "actions": [
+          "pack_laptop",
+          "walk_to(24hr_mcdonalds)",
+          "sit_on(floor)"
+        ]
+      },
+      {
+        "trigger": "money < 10",
+        "actions": [
+          "set_facial_expression(panic, 0.9)",
+          "use(phone, check_bank)",
+          "play_animation(stressed_pace)"
+        ]
+      }
+    ],
+    "restricted_locations": [
+      "private_office",
+      "luxury_apartment",
+      "expensive_restaurant"
+    ],
+    "available_items": [
+      "old_laptop",
+      "cracked_phone",
+      "water_bottle",
+      "instant_noodles"
+    ]
+  },
+  
+  "jamie_rodriguez": {
+    "character_id": "jamie_rodriguez",
+    "display_name": "Jamie Rodriguez",
+    "avatar_mesh": "SK_Mannequin_ServiceWorker",
+    "economic_tier": "poor",
+    "default_location": "coffee_shop",
+    "clothing": {
+      "top": "barista_apron",
+      "bottom": "black_pants",
+      "shoes": "nonslip_shoes",
+      "accessories": ["name_tag", "worn_watch"]
+    },
+    "animations": {
+      "idle": "Idle_Standing_Tired",
+      "walk": "Walk_ServiceHustle",
+      "work": "Make_Coffee",
+      "clean": "Wipe_Counter",
+      "break": "Lean_Against_Wall",
+      "dream": "Look_Out_Window"
+    },
+    "behavioral_patterns": [
+      {
+        "trigger": "shift_start",
+        "actions": [
+          "put_on(apron)",
+          "walk_to(coffee_machine)",
+          "set_facial_expression(fake_smile, 0.7)"
+        ]
+      },
+      {
+        "trigger": "customer_arrives",
+        "actions": [
+          "turn_to(customer)",
+          "gesture(welcome)",
+          "talk_to(customer, 'What can I get started for you?')"
+        ]
+      }
+    ]
+  },
+  
+  "tyler_chen": {
+    "character_id": "tyler_chen",
+    "display_name": "Tyler Chen",
+    "avatar_mesh": "SK_Mannequin_TechBro",
+    "economic_tier": "wealthy",
+    "default_location": "tech_office",
+    "clothing": {
+      "top": "patagonia_vest",
+      "bottom": "designer_jeans",
+      "shoes": "allbirds",
+      "accessories": ["apple_watch", "airpods_pro"]
+    },
+    "animations": {
+      "idle": "Idle_Confident",
+      "walk": "Walk_Purpose",
+      "work": "Type_Standing_Desk",
+      "present": "Gesture_Presentation",
+      "phone": "Check_Stocks",
+      "social": "Fist_Bump"
+    },
+    "behavioral_patterns": [
+      {
+        "trigger": "market_open",
+        "actions": [
+          "use(phone, check_portfolio)",
+          "gesture(fist_pump)",
+          "talk_to(nearby, 'AAPL is crushing it!')"
+        ]
+      },
+      {
+        "trigger": "meeting_time",
+        "actions": [
+          "walk_to(conference_room, confident)",
+          "use(macbook, open_slides)",
+          "play_animation(power_pose)"
+        ]
+      }
+    ],
+    "available_locations": [
+      "tech_office",
+      "craft_brewery",
+      "whole_foods",
+      "climbing_gym",
+      "luxury_apartment"
+    ]
+  },
+  
+  "madison_worthington": {
+    "character_id": "madison_worthington",
+    "display_name": "Madison Worthington",
+    "avatar_mesh": "SK_Mannequin_Wealthy",
+    "economic_tier": "ultra_wealthy",
+    "default_location": "penthouse",
+    "clothing": {
+      "top": "designer_blouse",
+      "bottom": "luxury_yoga_pants",
+      "shoes": "designer_sneakers",
+      "accessories": ["diamond_earrings", "hermes_bag", "cartier_watch"]
+    },
+    "animations": {
+      "idle": "Idle_Elegant",
+      "walk": "Walk_Graceful",
+      "yoga": "Yoga_Flow",
+      "phone": "Selfie_Pose",
+      "dismiss": "Hand_Wave_Dismissive",
+      "laugh": "Laugh_Fake"
+    },
+    "behavioral_patterns": [
+      {
+        "trigger": "see_homeless",
+        "actions": [
+          "look_away",
+          "walk_faster",
+          "use(phone, donate_5_dollars)",
+          "post_instagram('Just gave back! #Blessed')"
+        ]
+      },
+      {
+        "trigger": "morning",
+        "actions": [
+          "walk_to(yoga_studio)",
+          "play_animation(sun_salutation)",
+          "drink(green_juice)",
+          "post_instagram('Gratitude is everything 🙏')"
+        ]
+      }
+    ],
+    "special_abilities": [
+      "summon_assistant",
+      "call_driver",
+      "reserve_anywhere",
+      "skip_line"
+    ]
+  },
+  
+  "maria_gonzalez": {
+    "character_id": "maria_gonzalez",
+    "display_name": "Maria Gonzalez",
+    "avatar_mesh": "SK_Mannequin_Nurse",
+    "economic_tier": "struggling",
+    "default_location": "hospital",
+    "clothing": {
+      "top": "scrubs_faded",
+      "bottom": "scrubs_pants",
+      "shoes": "worn_clogs",
+      "accessories": ["stethoscope", "badge", "hair_tie"]
+    },
+    "animations": {
+      "idle": "Idle_Exhausted_Standing",
+      "walk": "Walk_Hurried",
+      "work": "Check_Patient",
+      "comfort": "Pat_Shoulder",
+      "stress": "Rub_Temples",
+      "break": "Sit_Exhausted"
+    },
+    "behavioral_patterns": [
+      {
+        "trigger": "shift_12_hours",
+        "actions": [
+          "play_animation(stretch_back)",
+          "walk_to(break_room)",
+          "sit_on(chair)",
+          "use(phone, text_babysitter)"
+        ]
+      },
+      {
+        "trigger": "patient_crisis",
+        "actions": [
+          "run_to(patient_room)",
+          "play_animation(medical_procedure)",
+          "set_facial_expression(focused, 1.0)"
+        ]
+      },
+      {
+        "trigger": "paycheck_received",
+        "actions": [
+          "use(phone, pay_rent)",
+          "use(phone, pay_daycare)",
+          "check_balance",
+          "set_facial_expression(worried, 0.8)"
+        ]
+      }
+    ]
+  }
+}
