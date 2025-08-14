@@ -5,7 +5,8 @@
  */
 
 const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
-const WebSocket = require('ws');
+let WebSocket;
+try { WebSocket = require('ws'); } catch (e) { WebSocket = null; }
 const EventEmitter = require('events');
 
 class MultiCharacterWorld extends EventEmitter {
@@ -140,6 +141,7 @@ class MultiCharacterWorld extends EventEmitter {
 
   async connectToAI() {
     return new Promise((resolve) => {
+      if (!WebSocket) { console.warn('ws module not available; skipping AI connection'); return resolve(); }
       console.log('🤖 Connecting to AI decision service...');
       
       this.aiWebSocket = new WebSocket(this.config.aiWebSocketUrl);

@@ -1,0 +1,224 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'S3 bucket and CloudFront CDN for AI character generated content'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: agentic-demo
+    Description: Project name for resource naming
+  
+  BucketName:
+    Type: String
+    Default: agentic-character-content
+    Description: S3 bucket name for content storage
+
+Resources:
+  # S3 Bucket for Content
+  ContentBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${BucketName}-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, PUT, POST, HEAD]
+            AllowedOrigins: ['*']
+            MaxAge: 3600
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Purpose
+          Value: AI-Character-Content
+
+  # Bucket Policy for Public Read
+  ContentBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ContentBucket
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Sub '${ContentBucket.Arn}/*'
+          - Sid: CharacterWriteAccess
+            Effect: Allow
+            Principal:
+              AWS: !GetAtt ContentWriterRole.Arn
+            Action:
+              - 's3:PutObject'
+              - 's3:PutObjectAcl'
+            Resource: !Sub '${ContentBucket.Arn}/content/*'
+
+  # IAM Role for Characters to Write Content
+  ContentWriterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-content-writer'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - ec2.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3ContentWrite
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:PutObject'
+                  - 's3:GetObject'
+                  - 's3:ListBucket'
+                Resource:
+                  - !Sub '${ContentBucket.Arn}'
+                  - !Sub '${ContentBucket.Arn}/*'
+
+  # CloudFront Distribution
+  ContentCDN:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: !Sub 'CDN for ${ProjectName} AI character content'
+        Enabled: true
+        DefaultRootObject: index.html
+        Origins:
+          - Id: S3Origin
+            DomainName: !GetAtt ContentBucket.DomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+        PriceClass: PriceClass_100
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+        Tags:
+          - Key: Project
+            Value: !Ref ProjectName
+
+  # Lambda Function for MCP S3 Publishing
+  MCPPublisherFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-mcp-s3-publisher'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt ContentWriterRole.Arn
+      Environment:
+        Variables:
+          CONTENT_BUCKET: !Ref ContentBucket
+          CLOUDFRONT_DOMAIN: !GetAtt ContentCDN.DomainName
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          from datetime import datetime
+          
+          s3 = boto3.client('s3')
+          bucket = os.environ['CONTENT_BUCKET']
+          cdn_domain = os.environ['CLOUDFRONT_DOMAIN']
+          
+          def lambda_handler(event, context):
+              """MCP tool handler for S3 publishing"""
+              
+              character_id = event.get('character_id')
+              content_type = event.get('content_type')
+              content = event.get('content')
+              
+              # Generate S3 key
+              timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+              key = f"content/{character_id}/{content_type}/{timestamp}.html"
+              
+              # Upload to S3
+              s3.put_object(
+                  Bucket=bucket,
+                  Key=key,
+                  Body=content,
+                  ContentType='text/html',
+                  Metadata={
+                      'author': character_id,
+                      'created': datetime.now().isoformat()
+                  }
+              )
+              
+              # Return CDN URL
+              url = f"https://{cdn_domain}/{key}"
+              
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps({
+                      'url': url,
+                      's3_key': key,
+                      'character': character_id
+                  })
+              }
+      Timeout: 30
+      MemorySize: 256
+
+Outputs:
+  BucketName:
+    Description: S3 bucket name
+    Value: !Ref ContentBucket
+    Export:
+      Name: !Sub '${ProjectName}-content-bucket'
+  
+  BucketURL:
+    Description: S3 bucket website URL
+    Value: !GetAtt ContentBucket.WebsiteURL
+    Export:
+      Name: !Sub '${ProjectName}-bucket-url'
+  
+  CloudFrontURL:
+    Description: CloudFront distribution URL
+    Value: !Sub 'https://${ContentCDN.DomainName}'
+    Export:
+      Name: !Sub '${ProjectName}-cdn-url'
+  
+  CloudFrontDistributionId:
+    Description: CloudFront distribution ID
+    Value: !Ref ContentCDN
+    Export:
+      Name: !Sub '${ProjectName}-cdn-id'
+  
+  ContentWriterRoleArn:
+    Description: IAM role for content writers
+    Value: !GetAtt ContentWriterRole.Arn
+    Export:
+      Name: !Sub '${ProjectName}-writer-role'
+  
+  MCPPublisherFunctionArn:
+    Description: Lambda function for MCP publishing
+    Value: !GetAtt MCPPublisherFunction.Arn
+    Export:
+      Name: !Sub '${ProjectName}-mcp-publisher'

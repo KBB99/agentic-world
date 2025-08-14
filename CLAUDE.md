@@ -155,13 +155,143 @@ All deployment outputs are stored in `aws/out/`:
 
 ## AI Agent System (LLM-Powered NPCs)
 
-The system simulates realistic characters with persistent memories, economic struggles, and spatial awareness using Claude via AWS Bedrock.
+The system simulates realistic characters with persistent memories, economic struggles, spatial awareness, and digital presence using Claude via AWS Bedrock.
 
 ### Architecture
 ```
 Character Memories (DynamoDB) → Claude AI → Decision with Context
      ↓                                           ↓
 World State → Affects Others → WebSocket → Viewer Telemetry
+     ↓                                           ↓
+MCP Tools → Digital Interactions → Viewer Messages → AI Responses
+```
+
+### Web Interface & Interactive Simulation
+
+#### Starting the Web Interface
+```bash
+# Start the web server
+cd web-interface
+node server.js
+
+# Or use the helper script
+bash start-web-interface.sh
+
+# Open in browser
+open http://localhost:3001
+```
+
+#### Web Interface Features
+
+**Character Cards Display:**
+- 💰 Current money and survival days
+- 📺 Stream follower count  
+- 📱 Social media followers
+- 🔴 LIVE badge when streaming
+- 📍 Current location
+- 🔋 Needs meters (hunger, exhaustion, stress)
+- 💬 Message button for direct interaction
+
+**Expandable Details:**
+- Personality description
+- Background story
+- Current situation
+- Goals list
+- Recent memories (last 5)
+- Last MCP action taken
+- Recent viewer interactions
+
+**Controls:**
+- **Run Turn (AI + MCP)**: Execute simulation with Bedrock and MCP tools
+- **Run Multiple Turns**: Batch execution
+- **Refresh**: Update display
+- **Reset World**: Start fresh simulation
+
+**Keyboard Shortcuts:**
+- `Space` - Run a turn
+- `R` - Refresh state
+- `Escape` - Close message modal
+
+### Interactive Messaging System
+
+#### Features
+- **💬 Direct Messaging**: Click "Message" button on any character card
+- **AI-Powered Responses**: Characters respond based on personality and situation
+- **Persistent Chat History**: Messages stored in DynamoDB
+- **Emotional States**: Characters express feelings in responses
+- **Context-Aware**: Responses reflect economic status and current needs
+
+#### Message API Endpoints
+```bash
+# Send message to character
+POST /send-message
+{
+  "characterId": "alex_chen",
+  "message": "How are you doing?",
+  "senderName": "Viewer"
+}
+
+# Get message history
+GET /messages/:characterId
+```
+
+#### Example Interactions
+- Message **Alex Chen** (struggling writer): "How are you holding up?"
+  - Response: "Thanks for reaching out. Every bit of support helps when you're struggling like I am." *[Feeling: grateful but exhausted]*
+
+- Message **Victoria Sterling** (SVP): "What do you think about housing costs?"
+  - Response: "The market is performing exceptionally well. Our portfolio continues to deliver strong returns." *[Feeling: satisfied]*
+
+### MCP Tools for Digital Presence
+
+Characters can use these Model Context Protocol tools:
+
+- **read_viewer_messages** - Read messages from stream viewers
+- **respond_to_viewer** - Reply to specific viewers  
+- **check_viewer_sentiment** - Gauge audience mood
+- **read_donations** - Check donation messages
+- **thank_donor** - Acknowledge supporters
+- **ask_viewers_for_help** - Request assistance when desperate
+- **post_to_social** - Share on social media platforms
+- **check_crowdfunding** - Monitor crowdfunding campaigns
+- **stream_performance** - Stream content for followers
+
+#### Running MCP-Enabled Simulation
+```bash
+# Run with MCP tools enabled (streaming, social media, viewer interactions)
+python3 execute-simulation-turn-with-mcp.py --use-bedrock --turns 1
+
+# Standard simulation without MCP
+python3 execute-simulation-turn.py --use-bedrock --turns 1
+```
+
+#### Example MCP Actions
+```python
+# Poor character asking for help
+{
+  "action": "stream_for_donations",
+  "mcp_tool": "ask_viewers_for_help",
+  "tool_params": {
+    "problem": "need money for food",
+    "urgency": "high"
+  },
+  "reasoning": "Desperate for money, asking viewers for help",
+  "emotion": "desperate",
+  "urgency": "immediate"
+}
+
+# Wealthy character posting
+{
+  "action": "post_to_social",
+  "mcp_tool": "post_to_social",
+  "tool_params": {
+    "platform": "LinkedIn",
+    "message": "MegaProperty REIT celebrates record quarterly earnings"
+  },
+  "reasoning": "Promoting company success",
+  "emotion": "proud",
+  "urgency": "low"
+}
 ```
 
 ### Creating New Characters
@@ -249,47 +379,82 @@ locations = {
 # Characters choose movement based on needs vs resources
 ```
 
-### MCP Tool Integration
+### Character Profiles & Economic Tiers
 
-Characters can use MCP (Model Context Protocol) servers based on their economic position:
+#### Struggling Characters (< $100)
+- **Alex Chen**: Writer, couchsurfing, $53
+- **Jamie Rodriguez**: Film PA/barista, $43
+- Access to streaming, crowdfunding, viewer donations
+- Desperate actions trigger sympathy from viewers
+- High hunger, exhaustion, and stress levels
 
-```python
-# Poor characters ($0-100): Limited to free tools
-alex_tools = ['brave-search', 'google-maps', 'filesystem']
-# Uses: Finding free wifi, food banks, public resources
+#### Middle Class ($1K - $10K)
+- Tech workers, nurses
+- Moderate follower counts
+- Balanced viewer sentiment
+- Professional tools access
 
-# Middle class ($100-10K): Professional tools
-ashley_tools = ['github', 'postgres', 'puppeteer', 'slack', 'email']
-# Uses: Job hunting, freelancing, salary research
+#### Wealthy (> $100K)
+- **Victoria Sterling**: SVP at MegaProperty REIT, $500K
+- **Madison Worthington**: Trust fund, $25M
+- Negative viewer sentiment when streaming
+- Post about profits and luxury
+- All needs automatically met
 
-# Wealthy ($10K+): All tools including premium
-richard_tools = ['ALL MCP SERVERS', 'aws-kb', 'finance', 'proprietary']
-# Uses: Investment analysis, property acquisition, tax optimization
-```
+### DynamoDB Tables
 
-**Available MCP Servers** (from https://github.com/modelcontextprotocol/servers):
-- `filesystem` - File operations (resumes, documents)
-- `github` - Code repos, freelance opportunities
-- `google-maps` - Finding resources, planning routes
-- `brave-search` - Web search for opportunities
-- `puppeteer` - Automate job applications
-- `postgres` - Data analysis, business intelligence
-- `slack` - Team communication, gig finding
-- `aws-kb` - Cloud architecture (wealthy only)
-
-**Running MCP-Enabled Narratives:**
 ```bash
-# Characters use tools based on their needs
-python3 mcp-enabled-characters.py
+# Agent contexts and personalities
+agentic-demo-agent-contexts
 
-# Quick demo of tool inequality
-python3 demo-mcp-tools.py
+# World state and locations  
+agentic-demo-world-state
+
+# Character memories
+agentic-demo-character-memories
+
+# Message history (viewer-character interactions)
+agentic-demo-messages
 ```
 
-Example: Same search tool, different realities:
-- Alex searches: "free wifi near me" → McDonald's 30-min limit
-- Ashley searches: "software engineer salary NYC" → Negotiation data
-- Richard searches: "distressed properties high ROI" → 47 targets for acquisition
+#### Creating Tables
+```bash
+# Create messages table for chat history
+bash create-messages-table.sh
+```
+
+### Simulation Statistics
+
+The `/stats` endpoint provides:
+- Total characters
+- Current turn number
+- Wealth gap and ratio
+- Richest/poorest characters
+- Average needs (hunger, exhaustion, stress)
+
+### Testing Commands
+
+```bash
+# Test messaging system
+curl -X POST http://localhost:3001/send-message \
+  -H "Content-Type: application/json" \
+  -d '{
+    "characterId": "alex_chen",
+    "message": "How are you holding up?",
+    "senderName": "SupportiveViewer"
+  }'
+
+# Check simulation statistics
+curl http://localhost:3001/stats | python3 -m json.tool
+
+# Get character details with memories
+curl http://localhost:3001/characters/alex_chen | python3 -m json.tool
+
+# Run a simulation turn via API
+curl -X POST http://localhost:3001/run-turn \
+  -H "Content-Type: application/json" \
+  -d '{"useAI": true, "turns": 1}'
+```
 
 ### Cost Control
 

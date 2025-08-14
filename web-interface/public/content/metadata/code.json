@@ -1,0 +1,15 @@
+[
+  {
+    "id": "alex_chen_project_20250813_191848",
+    "author": "alex_chen",
+    "type": "web app",
+    "description": "A minimalist writing tracker",
+    "created": "2025-08-13T19:18:48.384819",
+    "path": "/content/code/alex_chen_project_20250813_191848/index.html",
+    "files": [
+      "index.html",
+      "style.css",
+      "app.js"
+    ]
+  }
+]

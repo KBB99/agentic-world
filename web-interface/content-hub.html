@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Character Content Hub</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .content-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .content-section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s;
+        }
+        
+        .content-section:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+        
+        .section-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #eee;
+        }
+        
+        .section-icon {
+            font-size: 2em;
+            margin-right: 15px;
+        }
+        
+        .section-title {
+            font-size: 1.5em;
+            color: #333;
+        }
+        
+        .content-item {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .content-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+        
+        .content-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .content-author {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+        
+        .content-meta {
+            display: flex;
+            gap: 15px;
+            font-size: 0.85em;
+            color: #999;
+        }
+        
+        .view-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 0.9em;
+            transition: opacity 0.3s;
+        }
+        
+        .view-button:hover {
+            opacity: 0.9;
+        }
+        
+        .generate-section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            max-width: 1400px;
+            margin: 0 auto 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .generate-controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .generate-controls select,
+        .generate-controls input {
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        
+        .generate-button {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: opacity 0.3s;
+        }
+        
+        .generate-button:hover {
+            opacity: 0.9;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        
+        .empty-state-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+            opacity: 0.5;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .social-post {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .social-stats {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        .code-project {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .code-files {
+            color: #0066cc;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎨 AI Character Content Hub</h1>
+        <p>View all content created by AI characters</p>
+    </div>
+    
+    <!-- Content Generation Controls -->
+    <div class="generate-section">
+        <h2>Generate New Content</h2>
+        <div class="generate-controls">
+            <select id="characterSelect">
+                <option value="">Select Character...</option>
+                <option value="alex_chen">Alex Chen (Writer)</option>
+                <option value="jamie_rodriguez">Jamie Rodriguez (Film PA)</option>
+                <option value="ashley_kim">Ashley Kim (Tech Worker)</option>
+                <option value="victoria_sterling">Victoria Sterling (CEO)</option>
+            </select>
+            
+            <select id="contentTypeSelect">
+                <option value="">Content Type...</option>
+                <option value="blog">Blog Post</option>
+                <option value="story">Short Story</option>
+                <option value="code">Code Project</option>
+                <option value="social">Social Post</option>
+            </select>
+            
+            <input type="text" id="topicInput" placeholder="Topic or prompt..." />
+            
+            <button class="generate-button" onclick="generateContent()">
+                🚀 Generate Content
+            </button>
+        </div>
+        <div id="generateStatus"></div>
+    </div>
+    
+    <div class="content-grid">
+        <!-- Blog Posts Section -->
+        <div class="content-section">
+            <div class="section-header">
+                <span class="section-icon">📝</span>
+                <h2 class="section-title">Blog Posts</h2>
+            </div>
+            <div id="blogsList">
+                <div class="empty-state">
+                    <div class="empty-state-icon">📝</div>
+                    <p>No blog posts yet</p>
+                    <p style="font-size: 0.9em; margin-top: 10px;">Generate content above!</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Stories Section -->
+        <div class="content-section">
+            <div class="section-header">
+                <span class="section-icon">📚</span>
+                <h2 class="section-title">Stories</h2>
+            </div>
+            <div id="storiesList">
+                <div class="empty-state">
+                    <div class="empty-state-icon">📚</div>
+                    <p>No stories yet</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Code Projects Section -->
+        <div class="content-section">
+            <div class="section-header">
+                <span class="section-icon">💻</span>
+                <h2 class="section-title">Code Projects</h2>
+            </div>
+            <div id="codeList">
+                <div class="empty-state">
+                    <div class="empty-state-icon">💻</div>
+                    <p>No code projects yet</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Social Media Section -->
+        <div class="content-section">
+            <div class="section-header">
+                <span class="section-icon">📱</span>
+                <h2 class="section-title">Social Media</h2>
+            </div>
+            <div id="socialList">
+                <div class="empty-state">
+                    <div class="empty-state-icon">📱</div>
+                    <p>No social posts yet</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let contentData = {
+            blogs: [],
+            stories: [],
+            code: [],
+            social: []
+        };
+        
+        async function loadContent() {
+            try {
+                const response = await fetch('/content-hub');
+                contentData = await response.json();
+                renderContent();
+            } catch (error) {
+                console.error('Error loading content:', error);
+            }
+        }
+        
+        function renderContent() {
+            // Render blogs
+            const blogsList = document.getElementById('blogsList');
+            if (contentData.blogs && contentData.blogs.length > 0) {
+                blogsList.innerHTML = contentData.blogs.map(blog => `
+                    <div class="content-item" onclick="viewContent('${blog.path}')">
+                        <div class="content-title">${blog.title}</div>
+                        <div class="content-author">by ${blog.author}</div>
+                        <div class="content-meta">
+                            <span>📖 ${blog.readTime}</span>
+                            <span>📝 ${blog.wordCount} words</span>
+                        </div>
+                        <button class="view-button">Read Blog</button>
+                    </div>
+                `).join('');
+            }
+            
+            // Render stories
+            const storiesList = document.getElementById('storiesList');
+            if (contentData.stories && contentData.stories.length > 0) {
+                storiesList.innerHTML = contentData.stories.map(story => `
+                    <div class="content-item" onclick="viewContent('${story.path}')">
+                        <div class="content-title">${story.title}</div>
+                        <div class="content-author">by ${story.author}</div>
+                        <div class="content-meta">
+                            <span>📖 ${story.genre}</span>
+                            <span>📝 ${story.wordCount} words</span>
+                        </div>
+                        <p style="font-size: 0.9em; color: #666; margin-top: 10px;">${story.excerpt}</p>
+                        <button class="view-button">Read Story</button>
+                    </div>
+                `).join('');
+            }
+            
+            // Render code projects
+            const codeList = document.getElementById('codeList');
+            if (contentData.code && contentData.code.length > 0) {
+                codeList.innerHTML = contentData.code.map(project => `
+                    <div class="content-item" onclick="viewContent('${project.path}')">
+                        <div class="content-title">${project.description || project.type}</div>
+                        <div class="content-author">by ${project.author}</div>
+                        <div class="code-project">
+                            <span class="code-files">📁 ${project.files.join(', ')}</span>
+                        </div>
+                        <button class="view-button">View Project</button>
+                    </div>
+                `).join('');
+            }
+            
+            // Render social posts
+            const socialList = document.getElementById('socialList');
+            if (contentData.social && contentData.social.length > 0) {
+                socialList.innerHTML = contentData.social.map(post => `
+                    <div class="social-post">
+                        <div class="content-author">@${post.author}</div>
+                        <p style="margin: 10px 0;">${post.content}</p>
+                        <div class="social-stats">
+                            <span>❤️ ${post.likes}</span>
+                            <span>💬 ${post.comments?.length || 0}</span>
+                            <span>🔄 ${post.shares}</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+        
+        function viewContent(path) {
+            window.open(path, '_blank');
+        }
+        
+        async function generateContent() {
+            const character = document.getElementById('characterSelect').value;
+            const contentType = document.getElementById('contentTypeSelect').value;
+            const topic = document.getElementById('topicInput').value;
+            
+            if (!character || !contentType) {
+                alert('Please select a character and content type');
+                return;
+            }
+            
+            const statusDiv = document.getElementById('generateStatus');
+            statusDiv.innerHTML = '<div class="spinner"></div><p>Generating content...</p>';
+            
+            try {
+                const response = await fetch('/generate-content', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        characterId: character,
+                        contentType: contentType,
+                        params: { topic: topic || 'general topic' }
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    statusDiv.innerHTML = `<p style="color: green;">✅ Content generated! <a href="${result.url}" target="_blank">View here</a></p>`;
+                    
+                    // Reload content after a short delay
+                    setTimeout(() => {
+                        loadContent();
+                        statusDiv.innerHTML = '';
+                    }, 3000);
+                } else {
+                    statusDiv.innerHTML = `<p style="color: red;">❌ Generation failed: ${result.error}</p>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<p style="color: red;">❌ Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Load content on page load
+        loadContent();
+        
+        // Refresh content every 10 seconds
+        setInterval(loadContent, 10000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S3 Content Viewer - AI Character Creations</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .cloudfront-url {
+            background: rgba(255,255,255,0.2);
+            padding: 10px 20px;
+            border-radius: 5px;
+            margin-top: 10px;
+            display: inline-block;
+        }
+        
+        .content-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .character-section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .character-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #eee;
+        }
+        
+        .character-name {
+            font-size: 1.8em;
+            color: #333;
+        }
+        
+        .character-status {
+            display: flex;
+            gap: 15px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        .content-type-section {
+            margin: 20px 0;
+        }
+        
+        .content-type-header {
+            font-size: 1.2em;
+            color: #555;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .content-list {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .content-item {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 5px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .content-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+        
+        .content-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .content-meta {
+            font-size: 0.85em;
+            color: #999;
+            display: flex;
+            gap: 15px;
+        }
+        
+        .content-link {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.9em;
+        }
+        
+        .content-link:hover {
+            text-decoration: underline;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(102, 126, 234, 0.3);
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .refresh-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: opacity 0.3s;
+        }
+        
+        .refresh-btn:hover {
+            opacity: 0.9;
+        }
+        
+        .tab-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            justify-content: center;
+        }
+        
+        .tab-btn {
+            padding: 10px 20px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .tab-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>☁️ S3 Content Viewer</h1>
+        <p>View all content published to S3 by AI characters</p>
+        <div class="cloudfront-url" id="cloudfrontUrl">Loading CloudFront URL...</div>
+    </div>
+    
+    <div class="tab-buttons">
+        <button class="tab-btn active" onclick="switchView('s3')">S3 Content</button>
+        <button class="tab-btn" onclick="switchView('local')">Local Content</button>
+        <button class="tab-btn" onclick="window.location.href='/content-hub.html'">Content Generator</button>
+    </div>
+    
+    <div class="content-container" id="contentContainer">
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Loading S3 content...</p>
+        </div>
+    </div>
+    
+    <script>
+        let currentView = 's3';
+        let contentData = null;
+        
+        async function loadS3Content() {
+            try {
+                const response = await fetch('/content-hub');
+                const data = await response.json();
+                contentData = data;
+                
+                if (currentView === 's3') {
+                    displayS3Content(data.s3Content);
+                } else {
+                    displayLocalContent(data);
+                }
+            } catch (error) {
+                console.error('Error loading content:', error);
+                document.getElementById('contentContainer').innerHTML = `
+                    <div class="empty-state">
+                        <p>Error loading content: ${error.message}</p>
+                        <button class="refresh-btn" onclick="loadS3Content()">Retry</button>
+                    </div>
+                `;
+            }
+        }
+        
+        function displayS3Content(s3Content) {
+            if (!s3Content || !s3Content.characters) {
+                document.getElementById('contentContainer').innerHTML = `
+                    <div class="empty-state">
+                        <p>No S3 content available</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Display CloudFront domain
+            if (s3Content.cloudfrontDomain) {
+                document.getElementById('cloudfrontUrl').textContent = 
+                    `CloudFront: https://${s3Content.cloudfrontDomain}`;
+            }
+            
+            let html = '';
+            
+            for (const [characterId, characterData] of Object.entries(s3Content.characters)) {
+                const characterName = characterId.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                
+                html += `
+                    <div class="character-section">
+                        <div class="character-header">
+                            <div class="character-name">📝 ${characterName}</div>
+                            <div class="character-status">
+                                <button class="refresh-btn" onclick="loadCharacterContent('${characterId}')">
+                                    🔄 Refresh
+                                </button>
+                            </div>
+                        </div>
+                `;
+                
+                if (characterData.content && Object.keys(characterData.content).length > 0) {
+                    for (const [contentType, items] of Object.entries(characterData.content)) {
+                        if (items && items.length > 0) {
+                            html += `
+                                <div class="content-type-section">
+                                    <div class="content-type-header">
+                                        ${getContentIcon(contentType)} ${contentType.charAt(0).toUpperCase() + contentType.slice(1)}
+                                        <span style="color: #999; font-size: 0.8em;">(${items.length} items)</span>
+                                    </div>
+                                    <div class="content-list">
+                            `;
+                            
+                            items.slice(-5).reverse().forEach(item => {
+                                const title = item.title || item.s3_key || 'Untitled';
+                                const url = item.cloudfrontUrl || item.url;
+                                const created = item.created ? new Date(item.created).toLocaleString() : 'Unknown';
+                                
+                                html += `
+                                    <div class="content-item" onclick="window.open('${url}', '_blank')">
+                                        <div class="content-title">${title}</div>
+                                        <div class="content-meta">
+                                            <span>📅 ${created}</span>
+                                            <a href="${url}" target="_blank" class="content-link" onclick="event.stopPropagation()">
+                                                View on CloudFront →
+                                            </a>
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                            
+                            html += `
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    }
+                } else {
+                    html += `
+                        <div class="empty-state">
+                            <p>No content published to S3 yet</p>
+                            <p style="font-size: 0.9em; margin-top: 10px;">
+                                Run simulation turns where ${characterName} writes content
+                            </p>
+                        </div>
+                    `;
+                }
+                
+                html += `</div>`;
+            }
+            
+            document.getElementById('contentContainer').innerHTML = html;
+        }
+        
+        function displayLocalContent(data) {
+            let html = '<div class="character-section"><h2>Local Content (Not in S3)</h2>';
+            
+            if (data.blogs && data.blogs.length > 0) {
+                html += '<div class="content-type-section"><h3>📝 Local Blogs</h3><div class="content-list">';
+                data.blogs.slice(-5).forEach(blog => {
+                    html += `
+                        <div class="content-item" onclick="window.open('${blog.path}', '_blank')">
+                            <div class="content-title">${blog.title}</div>
+                            <div class="content-meta">
+                                <span>by ${blog.author}</span>
+                                <span>${blog.readTime}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div></div>';
+            }
+            
+            html += '</div>';
+            document.getElementById('contentContainer').innerHTML = html;
+        }
+        
+        function getContentIcon(type) {
+            const icons = {
+                'blogs': '📝',
+                'stories': '📚',
+                'code': '💻',
+                'social': '📱',
+                'streams': '🎬'
+            };
+            return icons[type] || '📄';
+        }
+        
+        async function loadCharacterContent(characterId) {
+            try {
+                const response = await fetch(`/s3-content/${characterId}`);
+                const data = await response.json();
+                
+                // Update just this character's section
+                if (contentData && contentData.s3Content) {
+                    contentData.s3Content.characters[characterId] = data;
+                    displayS3Content(contentData.s3Content);
+                }
+            } catch (error) {
+                console.error(`Error loading ${characterId} content:`, error);
+            }
+        }
+        
+        function switchView(view) {
+            currentView = view;
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            if (contentData) {
+                if (view === 's3') {
+                    displayS3Content(contentData.s3Content);
+                } else {
+                    displayLocalContent(contentData);
+                }
+            }
+        }
+        
+        // Load content on page load
+        loadS3Content();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(loadS3Content, 30000);
+    </script>
+</body>
+</html>

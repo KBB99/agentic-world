@@ -49,6 +49,94 @@
       0%, 100% { transform: scaleY(0.8); }
       50% { transform: scaleY(1.3); }
     }
+
+    /* Control Panel with Tabs (left side) */
+    .panel {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      z-index: 5;
+      background: var(--panel-bg);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      width: 360px;
+      max-height: 72vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      backdrop-filter: blur(2px);
+    }
+    .tabs { display: flex; }
+    .tab-btn {
+      flex: 1;
+      background: transparent;
+      color: var(--text);
+      border: none;
+      padding: 8px 10px;
+      cursor: pointer;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom: 2px solid var(--accent);
+      background: rgba(54,211,140,0.08);
+    }
+    .tab { display: none; padding: 10px 12px; overflow: auto; }
+    .tab.active { display: block; }
+    .char-card {
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 8px;
+      background: rgba(15,15,15,0.5);
+    }
+    .char-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .char-meta { font-size: 12px; color: #9fb0c0; }
+    .kv { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0; }
+    .kv .k { width: auto; min-width: 80px; color: #9fb0c0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .kv .v { flex: 1; font-size: 13px; color: var(--text); }
+    .char-actions {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .char-actions input {
+      background: #0b1b26;
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 13px;
+    }
+    .char-actions button {
+      background: var(--accent);
+      color: #0b1b26;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .controls-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+    .controls-row input[type="number"] {
+      width: 80px;
+      background: #0b1b26;
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 6px 8px;
+    }
+    .small { font-size: 12px; color: #9fb0c0; margin-top: 6px; }
   </style>
 </head>
 <body>
@@ -86,6 +174,40 @@
    </div>
 
    <div id="toast"></div>
+
+   <!-- Control panel with tabs: Telemetry mirror, Characters, Controls -->
+   <div id="controlPanel" class="panel" aria-label="Control panel">
+     <div class="tabs">
+       <button class="tab-btn active" data-tab="t-telemetry">Telemetry</button>
+       <button class="tab-btn" data-tab="t-characters">Characters</button>
+       <button class="tab-btn" data-tab="t-controls">Controls</button>
+     </div>
+
+     <div id="t-telemetry" class="tab active">
+       <div class="row">
+         <div class="k">Connection</div>
+         <div class="v"><span id="status2" class="status off">Disconnected</span></div>
+       </div>
+       <div class="row"><div class="k">Goal</div><div class="v" id="goal2">—</div></div>
+       <div class="row"><div class="k">Action</div><div class="v" id="action2">—</div></div>
+       <div class="row"><div class="k">Rationale</div><div class="v" id="rationale2">—</div></div>
+       <div class="row"><div class="k">Result</div><div class="v" id="result2">—</div></div>
+       <div class="small">Right overlay shows live telemetry. This tab mirrors values for convenience.</div>
+     </div>
+
+     <div id="t-characters" class="tab">
+       <div id="charactersList">Loading...</div>
+     </div>
+
+     <div id="t-controls" class="tab">
+       <div class="controls-row">
+         <label for="runCount">Run turns:</label>
+         <input id="runCount" type="number" min="1" max="100" value="1" />
+         <button id="runBtn">Run</button>
+       </div>
+       <div class="small">Interactions are available per-character in the Characters tab.</div>
+     </div>
+   </div>
  </div>
  <script>
  (function() {
@@ -94,6 +216,7 @@
    const playOverlay = document.getElementById('playOverlay');
    const toast = document.getElementById('toast');
    function showToast(msg) { toast.textContent = msg; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2500); }
+
    const urlParams = new URLSearchParams(window.location.search);
    const srcParam = urlParams.get('src');
    const defaultLive = window.location.origin + '/live/index.m3u8';
@@ -128,20 +251,29 @@
      try { await video.play(); } catch (e) { /* user gesture needed */ }
    });
 
-   // Telemetry via SSE (proxied by CloudFront at /telemetry/stream)
+   // Telemetry elements (overlay and mirrored in left tab)
    const st = document.getElementById('status');
    const goal = document.getElementById('goal');
    const action = document.getElementById('action');
    const rationale = document.getElementById('rationale');
    const result = document.getElementById('result');
-   function setStatus(on) { st.classList.toggle('off', !on); st.textContent = on ? 'Agent Running' : 'Disconnected'; }
+   const st2 = document.getElementById('status2');
+   const goal2 = document.getElementById('goal2');
+   const action2 = document.getElementById('action2');
+   const rationale2 = document.getElementById('rationale2');
+   const result2 = document.getElementById('result2');
+
+   function setStatus(on) {
+     const text = on ? 'Agent Running' : 'Disconnected';
+     if (st) { st.classList.toggle('off', !on); st.textContent = text; }
+     if (st2) { st2.classList.toggle('off', !on); st2.textContent = text; }
+   }
    setStatus(false);
 
    // Animated agent behavior (simple SVG avatar with blink + talk)
    const agent = document.getElementById('agentBox');
    let talkTimer = null;
    function agentTalk(durationMs = 1800) {
-     // Reset any previous timer and (re)apply talk animation briefly
      if (talkTimer) clearTimeout(talkTimer);
      agent.classList.add('talk');
      talkTimer = setTimeout(() => {
@@ -150,50 +282,177 @@
      }, durationMs);
    }
 
-   // Telemetry: prefer WebSocket if provided (?ws=wss://...), else fall back to SSE (/telemetry/stream)
+   // API base: allow ?api=http(s)://host:port to target remote control plane
+   const apiBase = urlParams.get('api') || window.location.origin;
+
+   // Telemetry parsing supports both {goal,...} and {action:"telemetry", data:{...}}
+   function applyTelemetryFields(data) {
+     let talked = false;
+     if (typeof data.goal === 'string') { if (goal) goal.textContent = data.goal; if (goal2) goal2.textContent = data.goal; talked = true; }
+     if (typeof data.action === 'string') { if (action) action.textContent = data.action; if (action2) action2.textContent = data.action; talked = true; }
+     if (typeof data.rationale === 'string') { if (rationale) rationale.textContent = data.rationale; if (rationale2) rationale2.textContent = data.rationale; talked = true; }
+     if (typeof data.result === 'string') { if (result) result.textContent = data.result; if (result2) result2.textContent = data.result; }
+     if (talked) agentTalk(); // brief talk animation on update
+   }
    function handleTelemetry(d) {
      try {
-       const data = (typeof d === 'string') ? JSON.parse(d) : (d || {});
-       let talked = false;
-       if (typeof data.goal === 'string') { goal.textContent = data.goal; talked = true; }
-       if (typeof data.action === 'string') { action.textContent = data.action; talked = true; }
-       if (typeof data.rationale === 'string') { rationale.textContent = data.rationale; talked = true; }
-       if (typeof data.result === 'string') { result.textContent = data.result; }
-       if (talked) agentTalk(); // brief talk animation on update
+       let data = (typeof d === 'string') ? JSON.parse(d) : (d || {});
+       if (data && data.action === 'telemetry' && data.data) data = data.data;
+       applyTelemetryFields(data);
      } catch (_) {
        // ignore parse errors
      }
    }
 
-   const wsParam = urlParams.get('ws') || urlParams.get('telemetry');
-   if (wsParam && typeof WebSocket !== 'undefined') {
+   // Characters tab rendering and interactions
+   const charactersListEl = document.getElementById('charactersList');
+   function escapeHtml(s) {
+     const map = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+     return String(s).replace(/[&<>"']/g, function(m){ return map[m]; });
+   }
+   function charCardHtml(c) {
+     const needs = c.state?.needs || {};
+     const inventory = (c.state?.inventory || []).join(', ') || '—';
+     const goalText = c.state?.goal || '—';
+     const anim = c.state?.animation || 'idle';
+     const money = typeof c.state?.money === 'number' ? c.state.money : (typeof c.money === 'number' ? c.money : 0);
+     return `
+       <div class="char-card" data-id="${escapeHtml(c.id)}">
+         <div class="char-head">
+           <div>${escapeHtml(c.name)}</div>
+           <div class="char-meta">${escapeHtml(c.economicTier)} @ ${escapeHtml(c.location)}</div>
+         </div>
+         <div class="kv"><div class="k">Goal</div><div class="v">${escapeHtml(goalText)}</div></div>
+         <div class="kv"><div class="k">Anim</div><div class="v">${escapeHtml(anim)}</div></div>
+         <div class="kv"><div class="k">Needs</div><div class="v">hunger:${Number(needs.hunger ?? 'NaN')} thirst:${Number(needs.thirst ?? 'NaN')} exhaustion:${Number(needs.exhaustion ?? 'NaN')} stress:${Number(needs.stress ?? 'NaN')}</div></div>
+         <div class="kv"><div class="k">Money</div><div class="v">$${Number(money).toFixed(2)}</div></div>
+         <div class="kv"><div class="k">Inventory</div><div class="v">${escapeHtml(inventory)}</div></div>
+         <div class="char-actions">
+           <input type="text" placeholder="Set goal" class="in-goal"/><button class="btn-set-goal">Set</button>
+           <input type="text" placeholder="Send message" class="in-msg"/><button class="btn-send-msg">Send</button>
+           <input type="text" placeholder="Nudge action/anim" class="in-nudge"/><button class="btn-nudge">Nudge</button>
+         </div>
+       </div>
+     `;
+   }
+   function updateCharacters(list) {
+     if (!charactersListEl) return;
+     if (!Array.isArray(list)) { charactersListEl.innerHTML = '—'; return; }
+     charactersListEl.innerHTML = list.map(charCardHtml).join('');
+   }
+   async function fetchCharacters() {
+     try {
+       const r = await fetch(apiBase + '/api/characters', { cache: 'no-store' });
+       const j = await r.json();
+       updateCharacters(j.characters);
+     } catch (_) {}
+   }
+   if (charactersListEl) {
+     charactersListEl.addEventListener('click', async (ev) => {
+       const card = ev.target.closest('.char-card');
+       if (!card) return;
+       const id = card.getAttribute('data-id');
+       try {
+         if (ev.target.matches('.btn-set-goal')) {
+           const val = card.querySelector('.in-goal').value.trim();
+           if (!val) return;
+           await fetch(apiBase + '/api/interact', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ characterId: id, type: 'set_goal', payload: { goal: val } }) });
+           showToast('Goal set');
+         } else if (ev.target.matches('.btn-send-msg')) {
+           const val = card.querySelector('.in-msg').value.trim();
+           if (!val) return;
+           await fetch(apiBase + '/api/interact', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ characterId: id, type: 'message', payload: { text: val } }) });
+           showToast('Message sent');
+         } else if (ev.target.matches('.btn-nudge')) {
+           const val = card.querySelector('.in-nudge').value.trim();
+           if (!val) return;
+           await fetch(apiBase + '/api/interact', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ characterId: id, type: 'nudge_action', payload: { action: val } }) });
+           showToast('Nudged');
+         }
+       } catch (_) {
+         showToast('Action failed');
+       }
+     });
+   }
+
+   // Controls tab: Run turns
+   const runBtn = document.getElementById('runBtn');
+   const runCount = document.getElementById('runCount');
+   if (runBtn && runCount) {
+     runBtn.addEventListener('click', async () => {
+       let count = parseInt(runCount.value, 10);
+       if (!Number.isFinite(count) || count < 1) count = 1;
+       if (count > 100) count = 100;
+       try {
+         const r = await fetch(apiBase + '/api/run-turn', {
+           method: 'POST',
+           headers: {'Content-Type': 'application/json'},
+           body: JSON.stringify({ count })
+         });
+         const j = await r.json();
+         if (j.ok) {
+           showToast(`Ran ${j.ran} turn(s)`);
+         } else {
+           showToast(`Run failed: ${j.error || 'unknown'}`);
+         }
+       } catch (_) {
+         showToast('Run failed');
+       }
+     });
+   }
+
+   // Tabs switching
+   const controlPanel = document.getElementById('controlPanel');
+   if (controlPanel) {
+     controlPanel.addEventListener('click', (ev) => {
+       const btn = ev.target.closest('.tab-btn');
+       if (!btn) return;
+       const target = btn.getAttribute('data-tab');
+       for (const b of controlPanel.querySelectorAll('.tab-btn')) b.classList.remove('active');
+       btn.classList.add('active');
+       for (const t of controlPanel.querySelectorAll('.tab')) t.classList.remove('active');
+       const tabEl = controlPanel.querySelector('#' + target);
+       if (tabEl) tabEl.classList.add('active');
+     });
+   }
+
+   // Telemetry connection: prefer WS (?ws=wss://...), else SSE (default to apiBase/telemetry/stream or ?telemetry=http(s) url)
+   const wsParam = urlParams.get('ws');
+   const telemetryParam = urlParams.get('telemetry');
+   const sseUrl = telemetryParam && !/^wss?:/i.test(telemetryParam) ? telemetryParam : (apiBase + '/telemetry/stream');
+
+   if (wsParam && typeof WebSocket !== 'undefined' && /^wss?:/i.test(wsParam)) {
      try {
        const ws = new WebSocket(wsParam);
        ws.onopen = () => setStatus(true);
        ws.onmessage = (ev) => handleTelemetry(ev.data);
        ws.onerror = () => setStatus(false);
        ws.onclose = () => setStatus(false);
-     } catch (e) {
-       // If WS connect fails, try SSE fallback
-       try {
-         if (typeof EventSource !== 'undefined') {
-           const es = new EventSource('/telemetry/stream');
-           es.onopen = () => setStatus(true);
-           es.addEventListener('telemetry', (ev) => handleTelemetry(ev.data));
-           es.onerror = () => setStatus(false);
-         }
-       } catch (_) {}
+     } catch (_) {
+       startSSE();
      }
-   } else if (typeof EventSource !== 'undefined') {
-     try {
-       const es = new EventSource('/telemetry/stream');
-       es.onopen = () => setStatus(true);
-       es.addEventListener('telemetry', (ev) => handleTelemetry(ev.data));
-       es.onerror = () => setStatus(false);
-     } catch (e) {
-       // SSE unsupported or blocked
-     }
+   } else {
+     startSSE();
    }
+
+   function startSSE() {
+     if (typeof EventSource === 'undefined') return;
+     try {
+       const es = new EventSource(sseUrl);
+       es.onopen = () => { setStatus(true); fetchCharacters(); };
+       es.addEventListener('telemetry', (ev) => handleTelemetry(ev.data));
+       es.addEventListener('characters', (ev) => {
+         try {
+           const payload = JSON.parse(ev.data || '{}');
+           if (payload && payload.characters) updateCharacters(payload.characters);
+         } catch (_) {}
+       });
+       es.onerror = () => setStatus(false);
+     } catch (_) {}
+   }
+
+   // Initial characters fetch in case SSE connection is delayed
+   fetchCharacters();
  })();
  </script>
 </body>
