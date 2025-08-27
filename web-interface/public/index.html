@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentic Demo - Web Interface</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .link-card {
+            display: block;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .link-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        .link-card h3 {
+            margin: 0 0 10px 0;
+        }
+        .link-card p {
+            margin: 0;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        .status {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+        .status h2 {
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Agentic Demo - Lambda Web Interface</h1>
+        <p>Welcome to the serverless web interface for the Agentic Demo. This interface provides access to AI-powered character simulations, content viewing, and system monitoring.</p>
+        
+        <div class="links">
+            <a href="/dashboard" class="link-card">
+                <h3>📊 Dashboard</h3>
+                <p>View character states, run simulations, and interact with AI agents</p>
+            </a>
+            <a href="/content-hub.html" class="link-card">
+                <h3>📝 Content Hub</h3>
+                <p>Browse character-generated content including blogs, stories, and social media posts</p>
+            </a>
+            <a href="/s3-content-viewer.html" class="link-card">
+                <h3>☁️ S3 Content Viewer</h3>
+                <p>View content stored in S3 bucket with CloudFront CDN distribution</p>
+            </a>
+            <a href="/health" class="link-card">
+                <h3>❤️ Health Check</h3>
+                <p>Check system status and API health</p>
+            </a>
+        </div>
+        
+        <div class="status">
+            <h2>System Information</h2>
+            <p><strong>Deployment Type:</strong> AWS Lambda (Serverless)</p>
+            <p><strong>Region:</strong> us-east-1</p>
+            <p><strong>Cost Model:</strong> Pay-per-request (no idle charges)</p>
+            <p><strong>API Endpoints:</strong></p>
+            <ul>
+                <li>GET /agents - List all characters</li>
+                <li>GET /world - Get world state</li>
+                <li>GET /memories/:agentId - Get character memories</li>
+                <li>GET /content-hub - Get all content</li>
+                <li>POST /run-turn - Execute simulation turn</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

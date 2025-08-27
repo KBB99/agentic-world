@@ -1,0 +1,211 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Serverless deployment of Agentic Web Interface using Lambda'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: agentic-demo
+    Description: Project name for resource naming
+
+Resources:
+  # IAM Role for Lambda functions
+  WebInterfaceLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Scan
+                  - dynamodb:Query
+                Resource:
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProjectName}-agent-contexts'
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProjectName}-world-state'
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProjectName}-character-memories'
+                  - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${ProjectName}-messages'
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - 'arn:aws:s3:::agentic-demo-viewer-20250808-nyc-01/*'
+                  - 'arn:aws:s3:::agentic-demo-viewer-20250808-nyc-01'
+        - PolicyName: BedrockAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource: '*'
+        - PolicyName: LambdaInvoke
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-simulation-runner'
+
+  # Lambda function for Express server
+  WebInterfaceFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-web-interface'
+      Handler: lambda.handler
+      Runtime: nodejs18.x
+      Timeout: 30
+      MemorySize: 1024
+      Role: !GetAtt WebInterfaceLambdaRole.Arn
+      Code:
+        S3Bucket: !Sub '${ProjectName}-lambda-deployment-${AWS::Region}'
+        S3Key: lambda/web-interface.zip
+      Environment:
+        Variables:
+          NODE_ENV: production
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+          AGENTS_TABLE: !Sub '${ProjectName}-agent-contexts'
+          WORLD_TABLE: !Sub '${ProjectName}-world-state'
+          MEMORIES_TABLE: !Sub '${ProjectName}-character-memories'
+          MESSAGES_TABLE: !Sub '${ProjectName}-messages'
+          CONTENT_BUCKET: 'agentic-demo-viewer-20250808-nyc-01'
+          CLOUDFRONT_DOMAIN: ''
+          SIMULATION_FUNCTION: !Ref SimulationRunnerFunction
+
+  # API Gateway REST API
+  WebInterfaceApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub '${ProjectName}-web-interface-api'
+      Description: API Gateway for Agentic Web Interface
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  # API Gateway Resource for proxy
+  ProxyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref WebInterfaceApi
+      ParentId: !GetAtt WebInterfaceApi.RootResourceId
+      PathPart: '{proxy+}'
+
+  # API Gateway Method for root
+  RootMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref WebInterfaceApi
+      ResourceId: !GetAtt WebInterfaceApi.RootResourceId
+      HttpMethod: ANY
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebInterfaceFunction.Arn}/invocations'
+
+  # API Gateway Method for proxy
+  ProxyMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref WebInterfaceApi
+      ResourceId: !Ref ProxyResource
+      HttpMethod: ANY
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebInterfaceFunction.Arn}/invocations'
+
+  # Lambda permission for API Gateway
+  ApiGatewayInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref WebInterfaceFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebInterfaceApi}/*/*/*'
+
+  # API Gateway Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - RootMethod
+      - ProxyMethod
+    Properties:
+      RestApiId: !Ref WebInterfaceApi
+      StageName: prod
+
+  # CloudWatch Log Group for Web Interface
+  WebInterfaceLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ProjectName}-web-interface'
+      RetentionInDays: 7
+
+  # Lambda function for running simulation turns
+  SimulationRunnerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-simulation-runner'
+      Runtime: python3.9
+      Handler: lambda_simulation.handler
+      Timeout: 300
+      MemorySize: 512
+      Role: !GetAtt WebInterfaceLambdaRole.Arn
+      Code:
+        S3Bucket: !Sub '${ProjectName}-lambda-deployment-${AWS::Region}'
+        S3Key: lambda/simulation.zip
+      Environment:
+        Variables:
+          AGENTS_TABLE: !Sub '${ProjectName}-agent-contexts'
+          WORLD_TABLE: !Sub '${ProjectName}-world-state'
+          MEMORIES_TABLE: !Sub '${ProjectName}-character-memories'
+          CONTENT_BUCKET: 'agentic-demo-viewer-20250808-nyc-01'
+
+  # CloudWatch Log Group for Simulation Runner
+  SimulationLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ProjectName}-simulation-runner'
+      RetentionInDays: 7
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway URL
+    Value: !Sub 'https://${WebInterfaceApi}.execute-api.${AWS::Region}.amazonaws.com/prod'
+    Export:
+      Name: !Sub '${ProjectName}-api-url'
+  
+  FunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt WebInterfaceFunction.Arn
+    Export:
+      Name: !Sub '${ProjectName}-function-arn'
+  
+  SimulationFunctionArn:
+    Description: Simulation runner Lambda ARN
+    Value: !GetAtt SimulationRunnerFunction.Arn
+    Export:
+      Name: !Sub '${ProjectName}-simulation-function-arn'

@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentic Dashboard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f7;
+        }
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .characters {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        .character-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .character-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+        .character-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        .character-state {
+            font-size: 12px;
+            padding: 4px 8px;
+            background: #f0f0f0;
+            border-radius: 4px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+        }
+        .stat-label {
+            color: #666;
+        }
+        .stat-value {
+            font-weight: 500;
+        }
+        .needs {
+            margin-top: 15px;
+        }
+        .need-bar {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+        .need-label {
+            width: 80px;
+            font-size: 12px;
+            color: #666;
+        }
+        .need-progress {
+            flex: 1;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .need-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50 0%, #FFC107 50%, #F44336 100%);
+            transition: width 0.3s;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎭 Agentic Character Dashboard</h1>
+        <p>Monitor and control AI-powered character simulations</p>
+        <div class="controls">
+            <button onclick="loadCharacters()">🔄 Refresh</button>
+            <button onclick="runTurn()" id="runBtn">▶️ Run Turn</button>
+            <button onclick="runMultipleTurns()">⏩ Run 5 Turns</button>
+        </div>
+    </div>
+    
+    <div id="characters" class="characters">
+        <div class="loading">Loading characters...</div>
+    </div>
+    
+    <script>
+        // Get the base URL for API calls
+        const API_BASE = window.location.origin + '/prod';
+        
+        async function loadCharacters() {
+            console.log('Loading characters from:', `${API_BASE}/agents`);
+            try {
+                const response = await fetch(`${API_BASE}/agents`);
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const agents = await response.json();
+                console.log('Loaded agents:', agents.length);
+                
+                const container = document.getElementById('characters');
+                container.innerHTML = '';
+                
+                if (!agents || agents.length === 0) {
+                    container.innerHTML = '<div class="loading">No characters found</div>';
+                    return;
+                }
+                
+                agents.forEach(agent => {
+                    console.log('Creating card for:', agent.agentId, agent);
+                    const card = createCharacterCard(agent);
+                    container.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Error loading characters:', error);
+                console.error('Full error details:', error.stack);
+                document.getElementById('characters').innerHTML = 
+                    `<div class="loading">Error loading characters: ${error.message}<br>Check browser console for details.</div>`;
+            }
+        }
+        
+        function createCharacterCard(agent) {
+            const card = document.createElement('div');
+            card.className = 'character-card';
+            
+            const needs = agent.needs || {};
+            const name = agent.agentId || 'Unknown';
+            const displayName = name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            
+            card.innerHTML = `
+                <div class="character-header">
+                    <div class="character-name">${displayName}</div>
+                    <div class="character-state">${agent.current_state || 'idle'}</div>
+                </div>
+                
+                <div class="stats">
+                    <div class="stat">
+                        <span class="stat-label">💰 Money:</span>
+                        <span class="stat-value">$${(agent.money || agent.resources?.money || 0).toLocaleString()}</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">📍 Location:</span>
+                        <span class="stat-value">${agent.location || 'unknown'}</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">📺 Followers:</span>
+                        <span class="stat-value">${agent.stream_followers || 0}</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">📱 Social:</span>
+                        <span class="stat-value">${agent.social_media_followers || 0}</span>
+                    </div>
+                </div>
+                
+                <div class="needs">
+                    <div class="need-bar">
+                        <span class="need-label">🍔 Hunger:</span>
+                        <div class="need-progress">
+                            <div class="need-fill" style="width: ${needs.hunger || 0}%"></div>
+                        </div>
+                    </div>
+                    <div class="need-bar">
+                        <span class="need-label">😴 Exhaustion:</span>
+                        <div class="need-progress">
+                            <div class="need-fill" style="width: ${needs.exhaustion || 0}%"></div>
+                        </div>
+                    </div>
+                    <div class="need-bar">
+                        <span class="need-label">😰 Stress:</span>
+                        <div class="need-progress">
+                            <div class="need-fill" style="width: ${needs.stress || 0}%"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            return card;
+        }
+        
+        async function runTurn() {
+            const btn = document.getElementById('runBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Running...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/run-turn`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({use_ai: true, turns: 1})
+                });
+                
+                const result = await response.json();
+                console.log('Turn completed:', result);
+                
+                // Reload characters to show updated state
+                await loadCharacters();
+            } catch (error) {
+                console.error('Error running turn:', error);
+                alert('Error running turn. Check console for details.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '▶️ Run Turn';
+            }
+        }
+        
+        async function runMultipleTurns() {
+            for (let i = 0; i < 5; i++) {
+                await runTurn();
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+        
+        // Load characters on page load
+        loadCharacters();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(loadCharacters, 30000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Character Cards</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        .card { border: 1px solid #ccc; padding: 10px; margin: 10px; }
+        .stat { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>Testing Character Card Display</h1>
+    <button onclick="testAPI()">Load Characters</button>
+    <div id="output"></div>
+    
+    <script>
+        async function testAPI() {
+            const output = document.getElementById('output');
+            try {
+                const response = await fetch('https://2xjyh29o3m.execute-api.us-east-1.amazonaws.com/prod/agents');
+                const agents = await response.json();
+                
+                output.innerHTML = '<h2>Raw Data Test</h2>';
+                
+                agents.slice(0, 3).forEach(agent => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    
+                    // Test direct property access
+                    const html = `
+                        <h3>${agent.agentId}</h3>
+                        <div class="stat">Money (agent.money): $${agent.money}</div>
+                        <div class="stat">Location (agent.location): ${agent.location}</div>
+                        <div class="stat">Stream (agent.stream_followers): ${agent.stream_followers}</div>
+                        <div class="stat">Social (agent.social_media_followers): ${agent.social_media_followers}</div>
+                        <div class="stat">State (agent.current_state): ${agent.current_state}</div>
+                        <div class="stat">Needs hunger: ${agent.needs?.hunger || 0}%</div>
+                        <div class="stat">Needs exhaustion: ${agent.needs?.exhaustion || 0}%</div>
+                        <div class="stat">Needs stress: ${agent.needs?.stress || 0}%</div>
+                        <hr>
+                        <pre>${JSON.stringify(agent, null, 2).substring(0, 500)}</pre>
+                    `;
+                    
+                    card.innerHTML = html;
+                    output.appendChild(card);
+                });
+                
+            } catch(e) {
+                output.innerHTML = 'Error: ' + e.message;
+            }
+        }
+        
+        testAPI();
+    </script>
+</body>
+</html>

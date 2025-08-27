@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Agentic Demo Viewer</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.14/dist/hls.min.js"></script>
+  <style>
+    :root { --panel-bg: rgba(10,10,10,0.7); --accent: #36d38c; --text: #e9eef3; }
+    html,body { height: 100%; margin: 0; background: #000; color: var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;}
+    #container { position: relative; width: 100%; height: 100%; display: grid; place-items: center; }
+    video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+    #toast { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--panel-bg); color: var(--text); padding: 10px 14px; border-radius: 8px; font-size: 13px; border: 1px solid rgba(255,255,255,0.08); opacity: 0; transition: opacity 200ms ease-in-out; }
+    #toast.show { opacity: 1; }
+    .play-overlay { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+    .play-overlay button { pointer-events: all; background: var(--accent); color: #0b1b26; border: none; border-radius: 999px; padding: 10px 18px; font-weight: 600; letter-spacing: 0.3px; cursor: pointer; box-shadow: 0 6px 18px rgba(54,211,140,0.35); }
+
+
+    /* Control Panel with Tabs (left side) */
+    .panel {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      z-index: 5;
+      background: var(--panel-bg);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      width: 360px;
+      max-height: 72vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      backdrop-filter: blur(2px);
+    }
+    .tabs { display: flex; }
+    .tab-btn {
+      flex: 1;
+      background: transparent;
+      color: var(--text);
+      border: none;
+      padding: 8px 10px;
+      cursor: pointer;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom: 2px solid var(--accent);
+      background: rgba(54,211,140,0.08);
+    }
+    .tab { display: none; padding: 10px 12px; overflow: auto; }
+    .tab.active { display: block; }
+    .char-card {
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 8px;
+      background: rgba(15,15,15,0.5);
+    }
+    .char-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .char-meta { font-size: 12px; color: #9fb0c0; }
+    .kv { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0; }
+    .kv .k { width: auto; min-width: 80px; color: #9fb0c0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .kv .v { flex: 1; font-size: 13px; color: var(--text); }
+    .char-actions {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .char-actions input {
+      background: #0b1b26;
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 13px;
+    }
+    .char-actions button {
+      background: var(--accent);
+      color: #0b1b26;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .controls-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+    .controls-row input[type="number"] {
+      width: 80px;
+      background: #0b1b26;
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 6px 8px;
+    }
+    .small { font-size: 12px; color: #9fb0c0; margin-top: 6px; }
+  </style>
+</head>
+<body>
+ <div id="container">
+   <video id="player" controls playsinline></video>
+   <div class="play-overlay" id="playOverlay"><button id="playBtn">Play</button></div>
+
+
+   <div id="toast"></div>
+
+   <!-- Control panel with tabs: Telemetry mirror, Characters, Controls -->
+   <div id="controlPanel" class="panel" aria-label="Control panel">
+     <div class="tabs">
+       <button class="tab-btn active" data-tab="t-characters">Characters</button>
+       <button class="tab-btn" data-tab="t-controls">Controls</button>
+     </div>
+
+     <div id="t-characters" class="tab active">
+       <div id="charactersList">Loading...</div>
+     </div>
+
+     <div id="t-controls" class="tab">
+       <div class="controls-row">
+         <label for="runCount">Run turns:</label>
+         <input id="runCount" type="number" min="1" max="100" value="1" />
+         <button id="runBtn">Run</button>
+       </div>
+       <div class="small">Interactions are available per-character in the Characters tab.</div>
+     </div>
+   </div>
+ </div>
+ <script>
+ (function() {
+   const video = document.getElementById('player');
+   const playBtn = document.getElementById('playBtn');
+   const playOverlay = document.getElementById('playOverlay');
+   const toast = document.getElementById('toast');
+   function showToast(msg) { toast.textContent = msg; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2500); }
+
+   const urlParams = new URLSearchParams(window.location.search);
+   const srcParam = urlParams.get('src');
+   const defaultLive = window.location.origin + '/live/index.m3u8';
+   const fallbackVod = window.location.origin + '/assets/sample.mp4';
+   const sources = srcParam ? [srcParam] : [defaultLive, fallbackVod];
+   let current = 0;
+   function isHls(u) { return /\.m3u8(\?.*)?$/i.test(u); }
+   function tryNext() {
+     if (current >= sources.length) { showToast('No playable source found'); return; }
+     const src = sources[current++];
+     if (isHls(src)) {
+       if (window.Hls && window.Hls.isSupported()) {
+         const hls = new Hls({ lowLatencyMode: false, enableWorker: true });
+         hls.on(Hls.Events.ERROR, (e, data) => {
+           if (data.fatal) { hls.destroy(); showToast('HLS error, falling back'); tryNext(); }
+         });
+         hls.loadSource(src);
+         hls.attachMedia(video);
+       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+         video.src = src;
+       } else {
+         showToast('HLS not supported, falling back'); tryNext(); return;
+       }
+     } else {
+       video.src = src; // e.g., MP4 fallback
+     }
+   }
+   video.addEventListener('error', () => { showToast('Playback error, trying next source'); tryNext(); });
+   playBtn.addEventListener('click', async () => {
+     playOverlay.style.display = 'none';
+     tryNext();
+     try { await video.play(); } catch (e) { /* user gesture needed */ }
+   });
+
+
+   // API base: allow ?api=http(s)://host:port to target remote control plane
+   const apiBase = urlParams.get('api') || window.location.origin;
+
+
+   // Characters tab rendering and interactions
+   const charactersListEl = document.getElementById('charactersList');
+   function escapeHtml(s) {
+     const map = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+     return String(s).replace(/[&<>"']/g, function(m){ return map[m]; });
+   }
+   function charCardHtml(c) {
+     const needs = c.state?.needs || {};
+     const inventory = (c.state?.inventory || []).join(', ') || '—';
+     const goalText = c.state?.goal || '—';
+     const anim = c.state?.animation || 'idle';
+     const money = typeof c.state?.money === 'number' ? c.state.money : (typeof c.money === 'number' ? c.money : 0);
+     return `
+       <div class="char-card" data-id="${escapeHtml(c.id)}">
+         <div class="char-head">
+           <div>${escapeHtml(c.name)}</div>
+           <div class="char-meta">${escapeHtml(c.economicTier)} @ ${escapeHtml(c.location)}</div>
+         </div>
+         <div class="kv"><div class="k">Goal</div><div class="v">${escapeHtml(goalText)}</div></div>
+         <div class="kv"><div class="k">Anim</div><div class="v">${escapeHtml(anim)}</div></div>
+         <div class="kv"><div class="k">Needs</div><div class="v">hunger:${Number(needs.hunger ?? 'NaN')} thirst:${Number(needs.thirst ?? 'NaN')} exhaustion:${Number(needs.exhaustion ?? 'NaN')} stress:${Number(needs.stress ?? 'NaN')}</div></div>
+         <div class="kv"><div class="k">Money</div><div class="v">$${Number(money).toFixed(2)}</div></div>
+         <div class="kv"><div class="k">Inventory</div><div class="v">${escapeHtml(inventory)}</div></div>
+         <div class="char-actions">
+           <input type="text" placeholder="Set goal" class="in-goal"/><button class="btn-set-goal">Set</button>
+           <input type="text" placeholder="Send message" class="in-msg"/><button class="btn-send-msg">Send</button>
+           <input type="text" placeholder="Nudge action/anim" class="in-nudge"/><button class="btn-nudge">Nudge</button>
+         </div>
+       </div>
+     `;
+   }
+   function updateCharacters(list) {
+     if (!charactersListEl) return;
+     if (!Array.isArray(list)) { charactersListEl.innerHTML = '—'; return; }
+     charactersListEl.innerHTML = list.map(charCardHtml).join('');
+   }
+   async function fetchCharacters() {
+     try {
+       const r = await fetch(apiBase + '/api/characters', { cache: 'no-store' });
+       const j = await r.json();
+       updateCharacters(j.characters);
+     } catch (_) {}
+   }
+   if (charactersListEl) {
+     charactersListEl.addEventListener('click', async (ev) => {
+       const card = ev.target.closest('.char-card');
+       if (!card) return;
+       const id = card.getAttribute('data-id');
+       try {
+         if (ev.target.matches('.btn-set-goal')) {
+           const val = card.querySelector('.in-goal').value.trim();
+           if (!val) return;
+           await fetch(apiBase + '/api/interact', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ characterId: id, type: 'set_goal', payload: { goal: val } }) });
+           showToast('Goal set');
+         } else if (ev.target.matches('.btn-send-msg')) {
+           const val = card.querySelector('.in-msg').value.trim();
+           if (!val) return;
+           await fetch(apiBase + '/api/interact', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ characterId: id, type: 'message', payload: { text: val } }) });
+           showToast('Message sent');
+         } else if (ev.target.matches('.btn-nudge')) {
+           const val = card.querySelector('.in-nudge').value.trim();
+           if (!val) return;
+           await fetch(apiBase + '/api/interact', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ characterId: id, type: 'nudge_action', payload: { action: val } }) });
+           showToast('Nudged');
+         }
+       } catch (_) {
+         showToast('Action failed');
+       }
+     });
+   }
+
+   // Controls tab: Run turns
+   const runBtn = document.getElementById('runBtn');
+   const runCount = document.getElementById('runCount');
+   if (runBtn && runCount) {
+     runBtn.addEventListener('click', async () => {
+       let count = parseInt(runCount.value, 10);
+       if (!Number.isFinite(count) || count < 1) count = 1;
+       if (count > 100) count = 100;
+       try {
+         const r = await fetch(apiBase + '/api/run-turn', {
+           method: 'POST',
+           headers: {'Content-Type': 'application/json'},
+           body: JSON.stringify({ count })
+         });
+         const j = await r.json();
+         if (j.ok) {
+           showToast(`Ran ${j.ran} turn(s)`);
+         } else {
+           showToast(`Run failed: ${j.error || 'unknown'}`);
+         }
+       } catch (_) {
+         showToast('Run failed');
+       }
+     });
+   }
+
+   // Tabs switching
+   const controlPanel = document.getElementById('controlPanel');
+   if (controlPanel) {
+     controlPanel.addEventListener('click', (ev) => {
+       const btn = ev.target.closest('.tab-btn');
+       if (!btn) return;
+       const target = btn.getAttribute('data-tab');
+       for (const b of controlPanel.querySelectorAll('.tab-btn')) b.classList.remove('active');
+       btn.classList.add('active');
+       for (const t of controlPanel.querySelectorAll('.tab')) t.classList.remove('active');
+       const tabEl = controlPanel.querySelector('#' + target);
+       if (tabEl) tabEl.classList.add('active');
+     });
+   }
+
+
+   // Initial characters fetch in case SSE connection is delayed
+   fetchCharacters();
+ })();
+ </script>
+</body>
+</html>

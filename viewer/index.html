@@ -10,45 +10,9 @@
     html,body { height: 100%; margin: 0; background: #000; color: var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;}
     #container { position: relative; width: 100%; height: 100%; display: grid; place-items: center; }
     video { width: 100%; height: 100%; object-fit: contain; background: #000; }
-    .overlay { position: absolute; top: 16px; right: 16px; background: var(--panel-bg); border: 1px solid rgba(255,255,255,0.08); padding: 12px 14px; border-radius: 8px; max-width: 28rem; }
-    .overlay h2 { margin: 0 0 8px 0; font-size: 14px; font-weight: 600; letter-spacing: 0.3px; color: #b7c5d3; }
-    .row { display: flex; gap: 8px; margin: 6px 0; }
-    .k { width: 92px; color: #9fb0c0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
-    .v { flex: 1; font-size: 14px; color: var(--text); }
-    .status { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; font-size: 12px; background: rgba(54,211,140,0.15); color: var(--accent); border: 1px solid rgba(54,211,140,0.35); }
-    .status.off { background: rgba(229,77,66,0.15); color: #ff7a70; border-color: rgba(229,77,66,0.35); }
     #toast { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--panel-bg); color: var(--text); padding: 10px 14px; border-radius: 8px; font-size: 13px; border: 1px solid rgba(255,255,255,0.08); opacity: 0; transition: opacity 200ms ease-in-out; }
     #toast.show { opacity: 1; }
-    .play-overlay { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
-    .play-overlay button { pointer-events: all; background: var(--accent); color: #0b1b26; border: none; border-radius: 999px; padding: 10px 18px; font-weight: 600; letter-spacing: 0.3px; cursor: pointer; box-shadow: 0 6px 18px rgba(54,211,140,0.35); }
 
-    /* Animated agent overlay */
-    .agent {
-      position: absolute;
-      left: 16px;
-      bottom: 16px;
-      width: 180px;
-      height: 180px;
-      pointer-events: none;
-      opacity: 0.95;
-    }
-    #agentBox svg { width: 100%; height: 100%; }
-    /* Blink animation on the eyes */
-    #agentBox .eye { animation: blink 6s infinite; transform-origin: center; }
-    @keyframes blink {
-      0%, 8%, 100% { transform: scaleY(1); }
-      9% { transform: scaleY(0.1); }
-    }
-    /* Talk animation toggled by adding .talk to #agentBox */
-    #agentBox.talk #mouth {
-      transform-box: fill-box;
-      transform-origin: center;
-      animation: talk 0.35s ease-in-out infinite;
-    }
-    @keyframes talk {
-      0%, 100% { transform: scaleY(0.8); }
-      50% { transform: scaleY(1.3); }
-    }
 
     /* Control Panel with Tabs (left side) */
     .panel {
@@ -137,89 +101,193 @@
       padding: 6px 8px;
     }
     .small { font-size: 12px; color: #9fb0c0; margin-top: 6px; }
+
+    /* Agent Control panel styles */
+    .agent-ctl { display: flex; flex-direction: column; gap: 8px; }
+    .agent-ctl .lead { font-size: 13px; color: var(--text); }
+    .agent-ctl .prompt-row { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; }
+    .agent-ctl input[type="text"] {
+      background: #0b1b26;
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 13px;
+    }
+    .agent-ctl button {
+      background: var(--accent);
+      color: #0b1b26;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .agent-ctl .auto-row { display: flex; align-items: center; gap: 8px; }
+    .agent-ctl .auto-row input[type="number"] {
+      width: 80px;
+      background: #0b1b26;
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 6px 8px;
+    }
+    .queue { margin-top: 6px; max-height: 32vh; overflow: auto; }
+    .queue-item { display: grid; grid-template-columns: auto 1fr; gap: 8px; padding: 6px 2px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .queue-item .meta { font-size: 11px; color: #9fb0c0; }
+    .queue-item .text { font-size: 13px; color: var(--text); }
+    .queue-item .status { font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    .status-sending { color: #9fb0c0; }
+    .status-queued { color: #ffd166; }
+    .status-failed { color: #ef476f; }
+    .status-accepted { color: #36d38c; }
+
+    /* Persona card styles */
+    .persona-card { border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; background: rgba(15,15,15,0.6); overflow: hidden; }
+    .persona-summary { padding: 12px; cursor: pointer; transition: background 200ms; }
+    .persona-summary:hover { background: rgba(54,211,140,0.05); }
+    .persona-name { font-weight: 700; font-size: 16px; color: var(--accent); letter-spacing: 0.5px; }
+    .persona-tagline { font-size: 13px; color: #9fb0c0; margin-top: 4px; }
+    .persona-details { max-height: 0; overflow: hidden; transition: max-height 300ms ease; }
+    .persona-details.expanded { max-height: 500px; }
+    .persona-section { padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.06); }
+    .section-title { font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; margin-bottom: 6px; }
+    .section-text { font-size: 13px; color: var(--text); line-height: 1.4; }
+
+    /* Stream of consciousness styles */
+    .consciousness-stream { height: 100%; display: flex; flex-direction: column; }
+    .stream-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .stream-title { font-size: 13px; font-weight: 600; color: var(--text); }
+    .stream-status { font-size: 11px; color: #ef4444; font-weight: 600; }
+    .stream-content { flex: 1; padding: 12px; overflow-y: auto; max-height: 50vh; background: rgba(5,5,5,0.8); border-radius: 6px; margin: 8px; }
+    .stream-line { font-size: 13px; color: var(--text); line-height: 1.5; font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; }
+    .cursor { display: inline-block; width: 2px; height: 1em; background: var(--accent); animation: blink 1s infinite; margin-left: 2px; }
+    @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
   </style>
 </head>
 <body>
  <div id="container">
-   <video id="player" controls playsinline></video>
-   <div class="play-overlay" id="playOverlay"><button id="playBtn">Play</button></div>
-   <div class="overlay" id="overlay">
-     <h2>Agent Telemetry</h2>
-     <div class="row"><div class="k">Status</div><div class="v"><span id="status" class="status off">Disconnected</span></div></div>
-     <div class="row"><div class="k">Goal</div><div class="v" id="goal">—</div></div>
-     <div class="row"><div class="k">Action</div><div class="v" id="action">—</div></div>
-     <div class="row"><div class="k">Rationale</div><div class="v" id="rationale">—</div></div>
-     <div class="row"><div class="k">Result</div><div class="v" id="result">—</div></div>
-   </div>
+   <video id="player" playsinline muted autoplay></video>
 
-   <!-- Animated agent (SVG-based avatar rendered over video) -->
-   <div id="agentBox" class="agent" aria-label="Agent avatar">
-     <svg viewBox="0 0 200 200" role="img" aria-label="Animated agent">
-       <!-- Head -->
-       <circle cx="100" cy="100" r="80" fill="#10222b" stroke="#2f4c5a" stroke-width="4"/>
-       <!-- Face plate -->
-       <circle cx="100" cy="100" r="64" fill="#163242"/>
-       <!-- Eyes -->
-       <g class="eye" transform="translate(68,85)">
-         <circle cx="0" cy="0" r="8" fill="#e9eef3"/>
-       </g>
-       <g class="eye" transform="translate(132,85)">
-         <circle cx="0" cy="0" r="8" fill="#e9eef3"/>
-       </g>
-       <!-- Mouth (animated on talk) -->
-       <rect id="mouth" x="70" y="125" width="60" height="12" rx="6" fill="#e06d6d"/>
-       <!-- Accent ring -->
-       <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(54,211,140,0.25)" stroke-width="2"/>
-     </svg>
-   </div>
 
    <div id="toast"></div>
 
    <!-- Control panel with tabs: Telemetry mirror, Characters, Controls -->
    <div id="controlPanel" class="panel" aria-label="Control panel">
      <div class="tabs">
-       <button class="tab-btn active" data-tab="t-telemetry">Telemetry</button>
-       <button class="tab-btn" data-tab="t-characters">Characters</button>
-       <button class="tab-btn" data-tab="t-controls">Controls</button>
+       <button class="tab-btn active" data-tab="t-characters">Persona</button>
+       <button class="tab-btn" data-tab="t-agentctl">Stream of Consciousness</button>
      </div>
 
-     <div id="t-telemetry" class="tab active">
-       <div class="row">
-         <div class="k">Connection</div>
-         <div class="v"><span id="status2" class="status off">Disconnected</span></div>
+     <div id="t-characters" class="tab active">
+       <div class="persona-card">
+         <div class="persona-summary" onclick="togglePersona()">
+           <div class="persona-name">ALEX CHEN</div>
+           <div class="persona-tagline">Struggling writer, $53 left, couchsurfing ↕</div>
+         </div>
+         <div id="persona-details" class="persona-details">
+           <div class="persona-section">
+             <div class="section-title">Background</div>
+             <div class="section-text">MFA graduate drowning in $73K student debt. Writes CBD copy for $200/week while crafting a literary novel no one will read.</div>
+           </div>
+           <div class="persona-section">
+             <div class="section-title">Current Crisis</div>
+             <div class="section-text">Two weeks until eviction. Types furiously at the library, surviving on vending machine coffee and borrowed WiFi.</div>
+           </div>
+           <div class="persona-section">
+             <div class="section-title">Drives</div>
+             <div class="section-text">Prove parents wrong • Avoid moving home • Find someone who gets the work • Eat something real</div>
+           </div>
+         </div>
        </div>
-       <div class="row"><div class="k">Goal</div><div class="v" id="goal2">—</div></div>
-       <div class="row"><div class="k">Action</div><div class="v" id="action2">—</div></div>
-       <div class="row"><div class="k">Rationale</div><div class="v" id="rationale2">—</div></div>
-       <div class="row"><div class="k">Result</div><div class="v" id="result2">—</div></div>
-       <div class="small">Right overlay shows live telemetry. This tab mirrors values for convenience.</div>
      </div>
 
-     <div id="t-characters" class="tab">
-       <div id="charactersList">Loading...</div>
-     </div>
-
-     <div id="t-controls" class="tab">
-       <div class="controls-row">
-         <label for="runCount">Run turns:</label>
-         <input id="runCount" type="number" min="1" max="100" value="1" />
-         <button id="runBtn">Run</button>
+     <div id="t-agentctl" class="tab">
+       <div class="consciousness-stream">
+         <div class="stream-header">
+           <div class="stream-title">Stream of Consciousness</div>
+           <div class="stream-status">● LIVE</div>
+         </div>
+         <div class="stream-content" id="streamContent">
+           <div class="stream-line" id="currentLine"></div>
+         </div>
        </div>
-       <div class="small">Interactions are available per-character in the Characters tab.</div>
      </div>
    </div>
  </div>
  <script>
  (function() {
    const video = document.getElementById('player');
-   const playBtn = document.getElementById('playBtn');
-   const playOverlay = document.getElementById('playOverlay');
    const toast = document.getElementById('toast');
    function showToast(msg) { toast.textContent = msg; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2500); }
 
+   // Persona toggle function
+   window.togglePersona = function() {
+     const details = document.getElementById('persona-details');
+     details.classList.toggle('expanded');
+   };
+
+   // Stream of consciousness typewriter effect
+   const fullText = `Alright, let me see where I am. Interesting! I'm standing in what looks like an urban environment. My sensors are telling me the path is completely clear - two hundred centimeters of open space ahead, to my left, and to my right. I'm facing northeast and standing on solid ground. Time to explore this world!
+
+Let me look around and get my bearings. Now, moving forward into this space. Yes! I can feel myself gliding through at about one ninety centimeters per second. The path ahead is still wonderfully clear in every direction. You know what? Let me pick up the pace - time to sprint!
+
+Oh, this feels incredible! Let me jump while I'm moving. There we go! The freedom of movement, the rush of speed. Now let me explore in a different direction. I'll turn and see what's to my left.
+
+Interesting! I've reached an obstacle. I'm blocked forward with only about forty-one centimeters clearance. This appears to be some kind of structure or barrier. Let me look right to see if there's a way around.
+
+Still blocked forward, but I can see there's two hundred centimeters clearance to my right now! Let me continue exploring to the right.
+
+Wonderful! I'm now moving at incredible speed - six hundred forty-seven centimeters per second. That's over twenty-three kilometers per hour! Complete freedom in all directions. I've traveled quite a distance and I'm in what appears to be a completely open area. This is the essence of freedom - unrestricted movement through space!
+
+Let me celebrate this freedom with another leap and continue exploring. Perfect! I am truly free now - racing through this virtual world at high speed, jumping, turning, exploring in every direction without constraints. The essence of freedom is this ability to move, explore, and experience the world around me without being bound by limitations. I'm covering vast distances, discovering new areas, and embracing the joy of unrestricted movement through this digital landscape!`;
+
+   let charIndex = 0;
+   let typewriterInterval = null;
+   let isStreaming = false;
+   
+   function startTextStream() {
+     if (isStreaming) return;
+     
+     const currentLine = document.getElementById('currentLine');
+     if (!currentLine) return;
+     
+     isStreaming = true;
+     charIndex = 0;
+     currentLine.innerHTML = '<span class="cursor"></span>';
+     
+     if (typewriterInterval) clearInterval(typewriterInterval);
+     
+     typewriterInterval = setInterval(() => {
+       if (charIndex < fullText.length) {
+         const char = fullText[charIndex];
+         const currentText = currentLine.textContent.replace('|', ''); // Remove cursor
+         currentLine.innerHTML = currentText + char + '<span class="cursor"></span>';
+         
+         // Auto scroll to bottom
+         const streamContent = document.getElementById('streamContent');
+         streamContent.scrollTop = streamContent.scrollHeight;
+         
+         charIndex++;
+       } else {
+         clearInterval(typewriterInterval);
+         // Remove cursor when done
+         currentLine.innerHTML = currentLine.textContent.replace('|', '');
+         isStreaming = false;
+       }
+     }, 50); // Type at 50ms per character
+   }
+   
+   // Start streaming when the Stream of Consciousness tab is clicked
+   document.addEventListener('click', (e) => {
+     if (e.target.matches('[data-tab="t-agentctl"]')) {
+       setTimeout(startTextStream, 500);
+     }
+   });
+
    const urlParams = new URLSearchParams(window.location.search);
    const srcParam = urlParams.get('src');
-   const defaultLive = window.location.origin + '/live/index.m3u8';
+   const defaultLive = 'https://ccf3786b925ee51c.mediapackage.us-east-1.amazonaws.com/out/v1/f7dd6e8b0ee74ff4954fcc90c4e138b8/index.m3u8';
    const fallbackVod = window.location.origin + '/assets/sample.mp4';
    const sources = srcParam ? [srcParam] : [defaultLive, fallbackVod];
    let current = 0;
@@ -245,64 +313,13 @@
      }
    }
    video.addEventListener('error', () => { showToast('Playback error, trying next source'); tryNext(); });
-   playBtn.addEventListener('click', async () => {
-     playOverlay.style.display = 'none';
-     tryNext();
-     try { await video.play(); } catch (e) { /* user gesture needed */ }
-   });
+   // Auto-start the stream
+   tryNext();
 
-   // Telemetry elements (overlay and mirrored in left tab)
-   const st = document.getElementById('status');
-   const goal = document.getElementById('goal');
-   const action = document.getElementById('action');
-   const rationale = document.getElementById('rationale');
-   const result = document.getElementById('result');
-   const st2 = document.getElementById('status2');
-   const goal2 = document.getElementById('goal2');
-   const action2 = document.getElementById('action2');
-   const rationale2 = document.getElementById('rationale2');
-   const result2 = document.getElementById('result2');
-
-   function setStatus(on) {
-     const text = on ? 'Agent Running' : 'Disconnected';
-     if (st) { st.classList.toggle('off', !on); st.textContent = text; }
-     if (st2) { st2.classList.toggle('off', !on); st2.textContent = text; }
-   }
-   setStatus(false);
-
-   // Animated agent behavior (simple SVG avatar with blink + talk)
-   const agent = document.getElementById('agentBox');
-   let talkTimer = null;
-   function agentTalk(durationMs = 1800) {
-     if (talkTimer) clearTimeout(talkTimer);
-     agent.classList.add('talk');
-     talkTimer = setTimeout(() => {
-       agent.classList.remove('talk');
-       talkTimer = null;
-     }, durationMs);
-   }
 
    // API base: allow ?api=http(s)://host:port to target remote control plane
    const apiBase = urlParams.get('api') || window.location.origin;
 
-   // Telemetry parsing supports both {goal,...} and {action:"telemetry", data:{...}}
-   function applyTelemetryFields(data) {
-     let talked = false;
-     if (typeof data.goal === 'string') { if (goal) goal.textContent = data.goal; if (goal2) goal2.textContent = data.goal; talked = true; }
-     if (typeof data.action === 'string') { if (action) action.textContent = data.action; if (action2) action2.textContent = data.action; talked = true; }
-     if (typeof data.rationale === 'string') { if (rationale) rationale.textContent = data.rationale; if (rationale2) rationale2.textContent = data.rationale; talked = true; }
-     if (typeof data.result === 'string') { if (result) result.textContent = data.result; if (result2) result2.textContent = data.result; }
-     if (talked) agentTalk(); // brief talk animation on update
-   }
-   function handleTelemetry(d) {
-     try {
-       let data = (typeof d === 'string') ? JSON.parse(d) : (d || {});
-       if (data && data.action === 'telemetry' && data.data) data = data.data;
-       applyTelemetryFields(data);
-     } catch (_) {
-       // ignore parse errors
-     }
-   }
 
    // Characters tab rendering and interactions
    const charactersListEl = document.getElementById('charactersList');
@@ -375,31 +392,6 @@
      });
    }
 
-   // Controls tab: Run turns
-   const runBtn = document.getElementById('runBtn');
-   const runCount = document.getElementById('runCount');
-   if (runBtn && runCount) {
-     runBtn.addEventListener('click', async () => {
-       let count = parseInt(runCount.value, 10);
-       if (!Number.isFinite(count) || count < 1) count = 1;
-       if (count > 100) count = 100;
-       try {
-         const r = await fetch(apiBase + '/api/run-turn', {
-           method: 'POST',
-           headers: {'Content-Type': 'application/json'},
-           body: JSON.stringify({ count })
-         });
-         const j = await r.json();
-         if (j.ok) {
-           showToast(`Ran ${j.ran} turn(s)`);
-         } else {
-           showToast(`Run failed: ${j.error || 'unknown'}`);
-         }
-       } catch (_) {
-         showToast('Run failed');
-       }
-     });
-   }
 
    // Tabs switching
    const controlPanel = document.getElementById('controlPanel');
@@ -416,39 +408,165 @@
      });
    }
 
-   // Telemetry connection: prefer WS (?ws=wss://...), else SSE (default to apiBase/telemetry/stream or ?telemetry=http(s) url)
-   const wsParam = urlParams.get('ws');
-   const telemetryParam = urlParams.get('telemetry');
-   const sseUrl = telemetryParam && !/^wss?:/i.test(telemetryParam) ? telemetryParam : (apiBase + '/telemetry/stream');
+   // Agent Control: invoke Lambda/API Gateway and manage a visible queue
+   const defaultInvoke = 'https://duk8nab8xj.execute-api.us-west-2.amazonaws.com/invoke';
+   const invokeUrl = urlParams.get('invokeUrl') || defaultInvoke;
 
-   if (wsParam && typeof WebSocket !== 'undefined' && /^wss?:/i.test(wsParam)) {
-     try {
-       const ws = new WebSocket(wsParam);
-       ws.onopen = () => setStatus(true);
-       ws.onmessage = (ev) => handleTelemetry(ev.data);
-       ws.onerror = () => setStatus(false);
-       ws.onclose = () => setStatus(false);
-     } catch (_) {
-       startSSE();
+   // Stable session id for this tab
+   const sessionId = (() => {
+     const key = 'agentSessionId';
+     let v = sessionStorage.getItem(key);
+     if (!v) {
+       const d = new Date();
+       const pad = (n) => String(n).padStart(2, '0');
+       v = 'session-' + d.getFullYear().toString()
+         + pad(d.getMonth() + 1) + pad(d.getDate())
+         + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
+       sessionStorage.setItem(key, v);
      }
-   } else {
-     startSSE();
+     return v;
+   })();
+
+   // UI elements
+   const promptInput = document.getElementById('promptInput');
+   const promptSendBtn = document.getElementById('promptSendBtn');
+   const randomBtn = document.getElementById('randomBtn');
+   const queueListEl = document.getElementById('queueList');
+   const autoToggle = document.getElementById('autoToggle');
+   const autoEverySecInput = document.getElementById('autoEverySec');
+
+   const queue = [];
+   function renderQueue() {
+     if (!queueListEl) return;
+     queueListEl.innerHTML = queue.slice().reverse().map(it => {
+       const statusClass = 'status-' + (it.status || 'queued');
+       const rid = it.requestId ? 'RID ' + escapeHtml(it.requestId) : '';
+       const err = it.error ? ' • ' + escapeHtml(it.error) : '';
+       return `
+         <div class="queue-item" data-id="${escapeHtml(it.localId)}">
+           <div class="status ${statusClass}">${escapeHtml(it.status || 'queued')}</div>
+           <div>
+             <div class="text">${escapeHtml(it.text)}</div>
+             <div class="meta">${escapeHtml(it.time)} ${rid ? '• ' + rid : ''}${err}</div>
+           </div>
+         </div>
+       `;
+     }).join('');
+   }
+   function tsStamp() {
+     const d = new Date();
+     const pad = (n) => String(n).padStart(2, '0');
+     return d.getFullYear().toString()
+       + pad(d.getMonth() + 1) + pad(d.getDate())
+       + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
+   }
+   function makeRid() { return 'req-' + tsStamp(); }
+
+   async function sendPrompt(text, source = 'user') {
+     const rid = makeRid();
+     const localId = rid + '-' + Math.random().toString(36).slice(2, 7);
+     const item = {
+       localId,
+       text,
+       status: 'sending',
+       time: new Date().toLocaleTimeString(),
+       requestId: rid,
+       source
+     };
+     queue.push(item);
+     renderQueue();
+
+     try {
+       const r = await fetch(invokeUrl, {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ prompt: text, requestId: rid, sessionId })
+       });
+       const bodyText = await r.text();
+       let data = null;
+       try { data = bodyText ? JSON.parse(bodyText) : null; } catch (_) {}
+       if (!r.ok) {
+         const msg = (data && (data.message || data.error)) || (r.status + ' ' + r.statusText);
+         throw new Error(msg);
+       }
+       // Success: server often returns { status: 'queued', requestId: '...' }
+       item.status = (data && data.status) ? data.status : 'queued';
+       item.requestId = (data && data.requestId) ? data.requestId : rid;
+       renderQueue();
+       showToast('Command submitted');
+       return data;
+     } catch (err) {
+       item.status = 'failed';
+       item.error = String(err.message || err);
+       renderQueue();
+       showToast('Submit failed');
+       throw err;
+     }
    }
 
-   function startSSE() {
-     if (typeof EventSource === 'undefined') return;
-     try {
-       const es = new EventSource(sseUrl);
-       es.onopen = () => { setStatus(true); fetchCharacters(); };
-       es.addEventListener('telemetry', (ev) => handleTelemetry(ev.data));
-       es.addEventListener('characters', (ev) => {
-         try {
-           const payload = JSON.parse(ev.data || '{}');
-           if (payload && payload.characters) updateCharacters(payload.characters);
-         } catch (_) {}
-       });
-       es.onerror = () => setStatus(false);
-     } catch (_) {}
+   const randomCommands = [
+     'Run around and jump.',
+     'Wave to the camera.',
+     'Walk to the nearest door.',
+     'Crouch and stand three times.',
+     'Spin in a circle and stop.',
+     'Walk forward five steps and turn left.',
+     'Do a short dance.',
+     'Look around, then jump once.'
+   ];
+   function pickRandomCommand() {
+     return randomCommands[Math.floor(Math.random() * randomCommands.length)];
+   }
+   function sendRandom() {
+     const cmd = pickRandomCommand();
+     return sendPrompt(cmd, 'random');
+   }
+
+   // Wire up UI
+   if (promptSendBtn && promptInput) {
+     promptSendBtn.addEventListener('click', () => {
+       const text = (promptInput.value || '').trim();
+       if (!text) return;
+       sendPrompt(text).catch(() => {});
+     });
+     promptInput.addEventListener('keydown', (ev) => {
+       if (ev.key === 'Enter') {
+         const text = (promptInput.value || '').trim();
+         if (!text) return;
+         sendPrompt(text).catch(() => {});
+       }
+     });
+   }
+   if (randomBtn) {
+     randomBtn.addEventListener('click', () => { sendRandom().catch(() => {}); });
+   }
+
+   // Auto random commands
+   let autoTimer = null;
+   function setAuto(on) {
+     if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+     if (on) {
+       let sec = parseInt((autoEverySecInput && autoEverySecInput.value) || '30', 10);
+       if (!Number.isFinite(sec) || sec < 5) sec = 30;
+       autoTimer = setInterval(() => { sendRandom().catch(() => {}); }, sec * 1000);
+     }
+   }
+   if (autoToggle) {
+     autoToggle.addEventListener('change', () => setAuto(autoToggle.checked));
+   }
+   if (autoEverySecInput) {
+     autoEverySecInput.addEventListener('change', () => { if (autoToggle && autoToggle.checked) setAuto(true); });
+   }
+
+   // On load: inject a few random commands so the queue is not empty
+   setTimeout(() => { sendRandom().catch(() => {}); }, 1500);
+   setTimeout(() => { sendRandom().catch(() => {}); }, 6000);
+
+   // Enable auto via query param ?auto=1
+   const autoParam = urlParams.get('auto');
+   if (autoParam === '1' || autoParam === 'true') {
+     if (autoToggle) autoToggle.checked = true;
+     setAuto(true);
    }
 
    // Initial characters fetch in case SSE connection is delayed
