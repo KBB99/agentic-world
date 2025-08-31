@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dimes Square</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif;
+            background: #0a0a0a;
+            color: #e8e8e8;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .grain-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: 
+                radial-gradient(circle at 25% 25%, #1a1a1a 0%, transparent 50%),
+                radial-gradient(circle at 75% 75%, #0f0f0f 0%, transparent 50%),
+                url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><defs><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="1" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter></defs><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.02"/></svg>');
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 60px 20px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+            position: relative;
+        }
+
+        .title {
+            font-size: clamp(32px, 8vw, 64px);
+            font-weight: 300;
+            color: #ffffff;
+            margin-bottom: 16px;
+            letter-spacing: -0.02em;
+            position: relative;
+            display: inline-block;
+        }
+
+        .title::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #888, transparent);
+        }
+
+        .subtitle {
+            font-size: 16px;
+            color: #888;
+            font-weight: 400;
+            margin-top: 24px;
+            opacity: 0.8;
+        }
+
+        .tagline {
+            font-size: 13px;
+            color: #555;
+            margin-top: 8px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 500;
+        }
+
+        .demo-container {
+            background: #111;
+            border-radius: 12px;
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.6),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            overflow: hidden;
+            margin-bottom: 40px;
+            position: relative;
+            border: 1px solid #222;
+        }
+
+        .demo-header {
+            background: linear-gradient(135deg, #1a1a1a, #0d0d0d);
+            padding: 16px 20px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .demo-title {
+            font-size: 14px;
+            color: #ccc;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4ade80;
+            box-shadow: 0 0 12px rgba(74, 222, 128, 0.4);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .expand-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #ccc;
+            transition: all 0.2s;
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .expand-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.2);
+            color: #fff;
+        }
+
+        .demo-iframe {
+            width: 100%;
+            height: 70vh;
+            border: none;
+            display: block;
+            background: #000;
+        }
+
+        .fullscreen-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .fullscreen-content {
+            position: relative;
+            width: 95vw;
+            height: 95vh;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #333;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            z-index: 1001;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border: 1px solid #333;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+            transition: all 0.2s;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #555;
+        }
+
+        .fullscreen-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 40px 0;
+            color: #444;
+            font-size: 12px;
+            border-top: 1px solid #222;
+            margin-top: 40px;
+        }
+
+        .footer a {
+            color: #666;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .footer a:hover {
+            color: #999;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 40px 16px;
+            }
+            
+            .demo-iframe {
+                height: 60vh;
+            }
+
+            .demo-header {
+                flex-direction: column;
+                gap: 12px;
+                align-items: flex-start;
+            }
+
+            .expand-btn {
+                align-self: flex-end;
+            }
+        }
+
+        /* Subtle animations */
+        .demo-container {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        .header {
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes fadeInUp {
+            from { 
+                opacity: 0; 
+                transform: translateY(20px);
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="grain-overlay"></div>
+    
+    <div class="container">
+        <div class="header">
+            <h1 class="title">Dimes Square</h1>
+            <p class="subtitle">AI Agent Experience</p>
+            <p class="tagline">Live • Interactive • NYC</p>
+        </div>
+
+        <div class="demo-container">
+            <div class="demo-header">
+                <div class="demo-title">
+                    <div class="status-dot"></div>
+                    Agent Control Interface
+                </div>
+                <button class="expand-btn" onclick="expandDemo()">
+                    <span>⛶</span> Fullscreen
+                </button>
+            </div>
+            
+            <iframe 
+                class="demo-iframe"
+                src="https://d1u690gz6k82jo.cloudfront.net/?v=20250831-2200"
+                frameborder="0"
+                allowfullscreen>
+            </iframe>
+        </div>
+
+        <div class="footer">
+            <p>Powered by <a href="#">Strands Agent Architecture</a> • <a href="#">Real-time WebSocket Integration</a></p>
+        </div>
+    </div>
+
+    <div id="fullscreenOverlay" class="fullscreen-overlay">
+        <div class="fullscreen-content">
+            <button class="close-btn" onclick="closeFullscreen()">×</button>
+            <iframe id="fullscreenIframe" class="fullscreen-iframe" src=""></iframe>
+        </div>
+    </div>
+
+    <script>
+        function expandDemo() {
+            const overlay = document.getElementById('fullscreenOverlay');
+            const iframe = document.getElementById('fullscreenIframe');
+            
+            iframe.src = 'https://d1u690gz6k82jo.cloudfront.net/?v=20250831-2200';
+            overlay.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+            
+            setTimeout(() => {
+                overlay.style.opacity = '1';
+            }, 10);
+        }
+
+        function closeFullscreen() {
+            const overlay = document.getElementById('fullscreenOverlay');
+            const iframe = document.getElementById('fullscreenIframe');
+            
+            overlay.style.display = 'none';
+            document.body.style.overflow = 'auto';
+            iframe.src = '';
+        }
+
+        // Close on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeFullscreen();
+            }
+        });
+
+        // Add subtle parallax effect to grain overlay
+        document.addEventListener('mousemove', (e) => {
+            const grain = document.querySelector('.grain-overlay');
+            const x = e.clientX / window.innerWidth;
+            const y = e.clientY / window.innerHeight;
+            grain.style.transform = `translate(${x * 2}px, ${y * 2}px)`;
+        });
+    </script>
+</body>
+</html>
