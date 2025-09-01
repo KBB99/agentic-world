@@ -96,3 +96,5 @@ test-mcp.js
 !character_files/maria_gonzalez/
 !character_files/brittany_torres/
 !character_files/dorothy_jackson/
+# Simulation results
+*-results.json
