@@ -13,7 +13,6 @@
   "bugs": {
     "url": "https://github.com/KBB99/agentic-world/issues"
   },
-  "main": "simulate-agent-actions.js",
   "directories": {
     "doc": "docs"
   },
@@ -22,8 +21,7 @@
     "web-interface"
   ],
   "scripts": {
-    "start": "node server/control-server.js",
-    "start:control": "node server/control-server.js",
+    "start": "npm -w web-interface run start",
     "lint": "eslint . --ext .js,.mjs,.cjs --max-warnings 0",
     "lint:fix": "eslint . --ext .js,.mjs,.cjs --fix",
     "format": "prettier --write .",
