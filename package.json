@@ -47,7 +47,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.2",
     "@modelcontextprotocol/server-brave-search": "^0.6.2",
-    "@modelcontextprotocol/server-filesystem": "^2025.7.29"
+    "@modelcontextprotocol/server-filesystem": "^2025.8.21"
   },
   "devDependencies": {
     "eslint": "^9.11.1",
