@@ -153,11 +153,11 @@ This keeps the UI thin while leveraging MCP servers and local tools.
 
 ## Documentation
 
-- Unreal avatar control via MCP: [UNREAL-AVATAR-MCP.md](UNREAL-AVATAR-MCP.md)
+- Unreal avatar control via MCP: [docs/UNREAL-AVATAR-MCP.md](docs/UNREAL-AVATAR-MCP.md)
 - Strands agents + A2A (Agent-to-Agent) guide: [docs/A2A-Guide-for-Unreal-Strands.md](docs/A2A-Guide-for-Unreal-Strands.md)
 - MCP runbook and ops notes: [docs/MCP-RUNBOOK.md](docs/MCP-RUNBOOK.md)
-- Viewer/UI communication: [VIEWER-COMMUNICATION-SYSTEM.md](VIEWER-COMMUNICATION-SYSTEM.md)
-- MetaHuman integration notes: [METAHUMAN-AI-INTEGRATION.md](METAHUMAN-AI-INTEGRATION.md)
+- Viewer/UI communication: [docs/VIEWER-COMMUNICATION-SYSTEM.md](docs/VIEWER-COMMUNICATION-SYSTEM.md)
+- MetaHuman integration notes: [docs/METAHUMAN-AI-INTEGRATION.md](docs/METAHUMAN-AI-INTEGRATION.md)
 
 ## Development
 
