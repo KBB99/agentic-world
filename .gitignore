@@ -6,8 +6,6 @@ yarn-error.log*
 lerna-debug.log*
 .npm
 *.tgz
-package-lock.json
-yarn.lock
 
 # Python
 __pycache__/

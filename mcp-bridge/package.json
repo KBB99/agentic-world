@@ -7,6 +7,21 @@
   "scripts": {
     "start": "node index.js"
   },
+  "keywords": [
+    "MCP",
+    "Unreal",
+    "WebSocket",
+    "bridge"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KBB99/agentic-world.git"
+  },
+  "homepage": "https://github.com/KBB99/agentic-world#readme",
+  "bugs": {
+    "url": "https://github.com/KBB99/agentic-world/issues"
+  },
+  "author": "KBB99",
   "dependencies": {
     "ws": "^8.16.0"
   },

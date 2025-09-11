@@ -1,0 +1,35 @@
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+exclude = '''
+(
+  /(
+      \.git
+    | \.hg
+    | \.mypy_cache
+    | \.nox
+    | \.tox
+    | \.venv
+    | venv
+    | build
+    | dist
+    | node_modules
+  )/
+)
+'''
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [
+  ".git",
+  ".venv",
+  "venv",
+  "build",
+  "dist",
+  "node_modules"
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"]
+ignore = ["E501"]  # Let Black handle line-length

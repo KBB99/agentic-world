@@ -1,0 +1,30 @@
+# Normalize line endings and ensure consistent diffs
+* text=auto eol=lf
+
+# Common text files
+*.js text
+*.cjs text
+*.mjs text
+*.json text
+*.ts text
+*.tsx text
+*.md text
+*.yml text
+*.yaml text
+*.sh text eol=lf
+*.py text
+*.css text
+*.html text
+
+# Binary files (no diffs)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mp4 binary
+*.mov binary
+*.pdf binary
+
+# GitHub linguist hints
+docs/_build/** linguist-generated
